@@ -91,7 +91,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div className="space-y-2">
               <label htmlFor="username" className="text-sm font-medium text-slate-700">
-                نام کاربری
+                ایمیل یا نام کاربری
               </label>
               <div className="relative">
                 <User className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -99,7 +99,7 @@ export default function LoginPage() {
                   id="username"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="نام کاربری خود را وارد کنید"
+                  placeholder="ایمیل یا نام کاربری خود را وارد کنید"
                   className="pr-10"
                   autoComplete="username"
                   required
