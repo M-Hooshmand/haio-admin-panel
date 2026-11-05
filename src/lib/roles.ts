@@ -55,6 +55,12 @@ export interface PanelUser {
   last_name?: string
   display_name?: string
   role?: BackendRole | string
+  panel_role?: PanelRole | null
+  panel_role_label?: string
+  panel_sections?: string[]
+  is_active?: boolean
+  last_login?: string | null
+  created_at?: string
 }
 
 export interface NavItem {
@@ -148,6 +154,19 @@ export const NAV_ITEMS: NavItem[] = [
 export function navItemsForRole(role: PanelRole | null): NavItem[] {
   if (!role) return []
   return NAV_ITEMS.filter((item) => item.roles.includes(role))
+}
+
+/** Server-provided sections win; the role mapping is only a fallback. */
+export function navItemsForUser(user: PanelUser | null): NavItem[] {
+  if (Array.isArray(user?.panel_sections)) {
+    const allowed = new Set(user.panel_sections)
+    return NAV_ITEMS.filter((item) => allowed.has(item.key))
+  }
+  return navItemsForRole(resolvePanelRole(user?.panel_role ?? user?.role))
+}
+
+export function canAccessUser(user: PanelUser | null, href: string): boolean {
+  return navItemsForUser(user).some((item) => item.href === href)
 }
 
 export function canAccess(role: PanelRole | null, href: string): boolean {

@@ -7,7 +7,7 @@ export const REFRESH_TOKEN_KEY = "haio_admin_refresh"
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
-  headers: { "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json", "X-Haio-Panel": "admin" },
 })
 
 export function saveTokens(access: string, refresh: string) {

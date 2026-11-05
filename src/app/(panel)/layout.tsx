@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -22,7 +22,8 @@ import {
   X,
 } from "lucide-react"
 import { useAuthStore } from "@/stores/auth-store"
-import { NAV_ITEMS, PANEL_ROLE_LABELS, navItemsForRole } from "@/lib/roles"
+import { NAV_ITEMS, PANEL_ROLE_LABELS, navItemsForUser } from "@/lib/roles"
+import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -58,6 +59,15 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
     setMenuOpen(false)
   }, [pathname])
 
+  // Navigation audit is stored by the backend; this only reports the section.
+  const lastVisited = useRef("")
+  useEffect(() => {
+    if (!isAuthenticated || !pathname || lastVisited.current === pathname) return
+    lastVisited.current = pathname
+    const section = pathname.split("/")[1] || "dashboard"
+    void api.post("/panel/visit/", { section, path: pathname }).catch(() => undefined)
+  }, [pathname, isAuthenticated])
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -71,7 +81,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
 
   if (!isAuthenticated) return null
 
-  const items = navItemsForRole(role)
+  const items = navItemsForUser(user)
 
   if (!role) {
     return (

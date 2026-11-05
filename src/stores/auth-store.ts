@@ -23,7 +23,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) =>
     set({
       user,
-      role: resolvePanelRole(user?.role),
+      role: resolvePanelRole(user?.panel_role ?? user?.role),
       isAuthenticated: Boolean(user),
       isLoading: false,
     }),
@@ -37,7 +37,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await authService.getMe()
       set({
         user,
-        role: resolvePanelRole(user.role),
+        role: resolvePanelRole(user.panel_role ?? user.role),
         isAuthenticated: true,
         isLoading: false,
       })
