@@ -1,0 +1,157 @@
+export type BackendRole =
+  | "CUSTOMER"
+  | "SUPPORT_AGENT"
+  | "SUPPORT_MANAGER"
+  | "ADMIN"
+  | "SUPER_ADMIN"
+  | "MANAGER"
+  | "OFFICE"
+  | "SALES"
+  | "FINANCE"
+  | "TECHNICAL"
+
+export type PanelRole = "MANAGER" | "OFFICE" | "SALES" | "FINANCE" | "TECHNICAL"
+
+export const PANEL_ROLE_LABELS: Record<PanelRole, string> = {
+  MANAGER: "مدیر",
+  OFFICE: "کارمند اداری",
+  SALES: "کارمند فروش",
+  FINANCE: "کارمند مالی",
+  TECHNICAL: "بخش فنی",
+}
+
+/**
+ * Backend is the source of truth for permissions. This mapping only decides
+ * which shell/navigation a staff member sees, and will be replaced once the
+ * backend exposes the five business roles directly.
+ */
+export function resolvePanelRole(role?: string | null): PanelRole | null {
+  switch (role) {
+    case "SUPER_ADMIN":
+    case "ADMIN":
+    case "MANAGER":
+      return "MANAGER"
+    case "SUPPORT_MANAGER":
+    case "OFFICE":
+      return "OFFICE"
+    case "SALES":
+      return "SALES"
+    case "FINANCE":
+      return "FINANCE"
+    case "SUPPORT_AGENT":
+    case "TECHNICAL":
+      return "TECHNICAL"
+    default:
+      return null
+  }
+}
+
+export interface PanelUser {
+  id: number
+  username?: string | null
+  email?: string | null
+  mobile?: string | null
+  first_name?: string
+  last_name?: string
+  display_name?: string
+  role?: BackendRole | string
+}
+
+export interface NavItem {
+  key: string
+  href: string
+  title: string
+  description: string
+  roles: PanelRole[]
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  {
+    key: "dashboard",
+    href: "/dashboard",
+    title: "داشبورد",
+    description: "نمای کلی وضعیت پلتفرم",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+  },
+  {
+    key: "users",
+    href: "/users",
+    title: "کاربران",
+    description: "جست‌وجو و مدیریت حساب‌های کاربری",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE"],
+  },
+  {
+    key: "organizations",
+    href: "/organizations",
+    title: "سازمان‌ها",
+    description: "سازمان‌ها، اعضا و کیف پول",
+    roles: ["MANAGER", "OFFICE", "FINANCE"],
+  },
+  {
+    key: "subscriptions",
+    href: "/subscriptions",
+    title: "اشتراک‌ها",
+    description: "پلن‌ها و وضعیت اشتراک مشتریان",
+    roles: ["MANAGER", "OFFICE", "SALES"],
+  },
+  {
+    key: "invoices",
+    href: "/invoices",
+    title: "فاکتورها",
+    description: "فاکتورها، پرداخت‌ها و refund",
+    roles: ["MANAGER", "FINANCE"],
+  },
+  {
+    key: "haioflash",
+    href: "/haioflash",
+    title: "هایوفلش",
+    description: "ماشین‌های ابری و وضعیت نودها",
+    roles: ["MANAGER", "TECHNICAL"],
+  },
+  {
+    key: "haiogate",
+    href: "/haiogate",
+    title: "هایوگیت",
+    description: "اکانت‌های تحریم‌شکن",
+    roles: ["MANAGER", "TECHNICAL"],
+  },
+  {
+    key: "tickets",
+    href: "/tickets",
+    title: "تیکت‌ها",
+    description: "صف پشتیبانی و گفت‌وگو با مشتری",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+  },
+  {
+    key: "campaigns",
+    href: "/campaigns",
+    title: "کمپین‌ها",
+    description: "کمپین‌های رشد و پیام‌های گروهی",
+    roles: ["MANAGER", "SALES"],
+  },
+  {
+    key: "reports",
+    href: "/reports",
+    title: "گزارش‌ها",
+    description: "گزارش فروش، مصرف و فعالیت",
+    roles: ["MANAGER", "SALES", "FINANCE"],
+  },
+  {
+    key: "settings",
+    href: "/settings",
+    title: "تنظیمات",
+    description: "تنظیمات پنل و دسترسی‌ها",
+    roles: ["MANAGER"],
+  },
+]
+
+export function navItemsForRole(role: PanelRole | null): NavItem[] {
+  if (!role) return []
+  return NAV_ITEMS.filter((item) => item.roles.includes(role))
+}
+
+export function canAccess(role: PanelRole | null, href: string): boolean {
+  if (!role) return false
+  const item = NAV_ITEMS.find((entry) => entry.href === href)
+  return item ? item.roles.includes(role) : false
+}
