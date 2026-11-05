@@ -370,7 +370,7 @@ export default function ProformaPage() {
   async function removeInvoice(invoice: Invoice) {
     if (!window.confirm(`پیش‌فاکتور ${invoice.number} حذف شود؟`)) return
     try {
-      await api.delete(`/panel/proforma/${invoice.id}/`)
+      await api.post(`/panel/proforma/${invoice.id}/delete/`)
       setMessage({ kind: "ok", text: "پیش‌فاکتور حذف شد." })
       await loadList()
     } catch (error) {

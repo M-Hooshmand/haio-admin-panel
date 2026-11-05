@@ -76,7 +76,9 @@ async function proxy(
     }
   });
 
-  return new Response(await upstream.arrayBuffer(), {
+  const noBody = upstream.status === 204 || upstream.status === 205 || upstream.status === 304;
+
+  return new Response(noBody ? null : await upstream.arrayBuffer(), {
     status: upstream.status,
     headers: responseHeaders,
   });
