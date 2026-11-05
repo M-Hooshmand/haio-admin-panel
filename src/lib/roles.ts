@@ -108,6 +108,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "FINANCE"],
   },
   {
+    key: "proforma",
+    href: "/proforma",
+    title: "صدور پیش‌فاکتور",
+    description: "ساخت و خروجی پیش‌فاکتور رسمی",
+    roles: ["MANAGER", "FINANCE", "SALES"],
+  },
+  {
     key: "haioflash",
     href: "/haioflash",
     title: "هایوفلش",
