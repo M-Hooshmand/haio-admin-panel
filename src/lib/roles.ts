@@ -129,6 +129,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "TECHNICAL"],
   },
   {
+    key: "monitoring",
+    href: "/monitoring",
+    title: "مونیتورینگ کاربران",
+    description: "کاربران آنلاین و فعال امروز",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+  },
+  {
     key: "tickets",
     href: "/tickets",
     title: "تیکت‌ها",

@@ -151,9 +151,11 @@ const VERIFICATION_LABELS: Record<VerificationLevel, string> = {
 }
 
 const ORDERINGS = [
-  { value: "activity", label: "جدیدترین فعالیت (ثبت‌نام/ورود)" },
+  { value: "activity", label: "همه با هم — جدیدترین ورود/ثبت‌نام" },
   { value: "created", label: "تاریخ ثبت‌نام" },
   { value: "login", label: "آخرین ورود" },
+  { value: "verified", label: "وضعیت احراز: احرازشده‌ها اول" },
+  { value: "unverified", label: "وضعیت احراز: احرازنشده‌ها اول" },
   { value: "payments", label: "بیشترین پرداختی" },
   { value: "balance", label: "بیشترین شارژ" },
 ]

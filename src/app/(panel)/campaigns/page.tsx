@@ -973,14 +973,13 @@ function CampaignDrawer({
     }
   }
 
-  const status =
-    campaign && campaign.queued > 0
-      ? "در حال ارسال"
-      : campaign && !campaign.approved_at
-        ? "پیش‌نویس"
-        : campaign?.is_paused
-          ? "متوقف"
-          : "پایان‌یافته"
+  const status = campaign?.is_paused
+    ? "متوقف"
+    : campaign && !campaign.approved_at
+      ? "پیش‌نویس"
+      : campaign && campaign.queued > 0
+        ? "در حال ارسال"
+        : "پایان‌یافته"
 
   return (
     <div

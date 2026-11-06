@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
+  Activity,
   BarChart3,
   Building2,
   Cpu,
@@ -39,6 +40,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   haiogate: ShieldCheck,
   tickets: Ticket,
   campaigns: Megaphone,
+  monitoring: Activity,
   reports: BarChart3,
   settings: Settings,
 }

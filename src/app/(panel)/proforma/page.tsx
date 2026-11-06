@@ -174,6 +174,7 @@ export default function ProformaPage() {
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null)
 
   const [logs, setLogs] = useState<LogRow[]>([])
+  const [latest, setLatest] = useState<Invoice | null>(null)
   const [loadingLogs, setLoadingLogs] = useState(false)
 
   const totals = useMemo(() => {
@@ -215,10 +216,12 @@ export default function ProformaPage() {
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true)
     try {
-      const { data } = await api.get<{ results: LogRow[] }>("/panel/proforma/logs/", {
-        params: { limit: 200 },
-      })
+      const { data } = await api.get<{ results: LogRow[]; latest_issued: Invoice | null }>(
+        "/panel/proforma/logs/",
+        { params: { limit: 200 } },
+      )
       setLogs(data.results)
+      setLatest(data.latest_issued ?? null)
     } catch (error) {
       setMessage({ kind: "error", text: extractError(error) })
     } finally {
@@ -713,14 +716,74 @@ export default function ProformaPage() {
       )}
 
       {tab === "logs" && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <h2 className="text-sm font-bold text-slate-800">لاگ صدور پیش‌فاکتور</h2>
-            <Button variant="outline" size="sm" onClick={() => void loadLogs()}>
-              <RefreshCw className={cn("h-4 w-4", loadingLogs && "animate-spin")} />
-              به‌روزرسانی
-            </Button>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800">آخرین پیش‌فاکتور صادرشده</h2>
+              {latest && (
+                <Button
+                  size="sm"
+                  onClick={() => void printInvoice(latest.id)}
+                  disabled={printingId === latest.id}
+                  title="دریافت مجدد PDF بدون صدور دوباره"
+                >
+                  {printingId === latest.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Printer className="h-4 w-4" />
+                  )}
+                  دانلود PDF
+                </Button>
+              )}
+            </div>
+            {latest ? (
+              <div className="grid gap-3 text-sm md:grid-cols-5">
+                <div>
+                  <div className="text-xs text-slate-400">شماره</div>
+                  <div className="font-mono font-semibold text-slate-800" dir="ltr">
+                    {latest.number}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">تاریخ صدور</div>
+                  <div className="num font-semibold text-slate-800">{latest.issued_at_jalali}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">صادرکننده</div>
+                  <div className="font-semibold text-slate-800">{latest.created_by_name || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">صادرشده برای</div>
+                  <div className="font-semibold text-slate-800">
+                    {latest.buyer_name || "—"}
+                    {latest.buyer_org && (
+                      <span className="text-slate-400"> — {latest.buyer_org}</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">مبلغ کل</div>
+                  <div className="num font-semibold text-slate-800">
+                    {latest.total_display}
+                    <span className="mr-1 text-[10px] font-normal text-slate-400">تومان</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="py-4 text-center text-sm text-slate-400">
+                هنوز پیش‌فاکتوری صادر نشده است.
+              </p>
+            )}
           </div>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <h2 className="text-sm font-bold text-slate-800">لاگ صدور پیش‌فاکتور</h2>
+              <Button variant="outline" size="sm" onClick={() => void loadLogs()}>
+                <RefreshCw className={cn("h-4 w-4", loadingLogs && "animate-spin")} />
+                به‌روزرسانی
+              </Button>
+            </div>
           <table className="w-full text-right text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
@@ -764,6 +827,7 @@ export default function ProformaPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
