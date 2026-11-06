@@ -140,6 +140,7 @@ interface FlashIp {
   subnet_mask: string | null
   is_ipv6: boolean
   is_active: boolean
+  geo: "iran" | "foreign"
   mac: string
   state: "assigned" | "free" | "inactive" | "stale"
   region: string | null
@@ -164,8 +165,22 @@ interface IpSummary {
   inactive: number
   stale: number
   ipv6: number
-  ranges: IpRange[]
-  range_count: number
+  // Iran — the Shatel Tehran blocks routed to the microVM nodes.
+  iran_total: number
+  iran_assigned: number
+  iran_free: number
+  iran_inactive: number
+  iran_stale: number
+  iran_ranges: IpRange[]
+  iran_range_count: number
+  // Foreign/retired rows — no server behind them any more.
+  foreign_total: number
+  foreign_assigned: number
+  foreign_free: number
+  foreign_inactive: number
+  foreign_stale: number
+  foreign_ranges: IpRange[]
+  foreign_range_count: number
 }
 
 interface IpPage {
@@ -467,6 +482,8 @@ export default function HaioflashPage() {
   const [ipSearchInput, setIpSearchInput] = useState("")
   const [ipSearch, setIpSearch] = useState("")
   const [ipState, setIpState] = useState("")
+  const [ipGeo, setIpGeo] = useState("iran")
+  const [showForeignRanges, setShowForeignRanges] = useState(false)
   const [ipPage, setIpPage] = useState(1)
   const [ipData, setIpData] = useState<IpPage | null>(null)
   const [ipLoading, setIpLoading] = useState(false)
@@ -526,6 +543,7 @@ export default function HaioflashPage() {
       }
       if (ipSearch) params.search = ipSearch
       if (ipState) params.state = ipState
+      if (ipGeo) params.geo = ipGeo
       const resp = await api.get<IpPage>("/panel/haioflash/ips/", { params })
       if (fetchIpsRef.current !== requestId) return
       setIpData(resp.data)
@@ -534,7 +552,7 @@ export default function HaioflashPage() {
     } finally {
       if (fetchIpsRef.current === requestId) setIpLoading(false)
     }
-  }, [allowed, ipPage, ipSearch, ipState])
+  }, [allowed, ipPage, ipSearch, ipState, ipGeo])
 
   useEffect(() => {
     void fetchVms()
@@ -767,28 +785,72 @@ export default function HaioflashPage() {
       ) : (
         <section className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <MetaCard title="کل آی‌پی‌ها" value={formatNumber(ipSummary?.total)} note={ipSummary?.ipv6 ? `${formatNumber(ipSummary.ipv6)} IPv6` : undefined} />
-            <MetaCard title="اختصاص‌یافته" value={formatNumber(ipSummary?.assigned)} note="به سرور کاربر فعال" highlight />
-            <MetaCard title="آزاد (استخر)" value={formatNumber(ipSummary?.free)} note="قابل اختصاص" />
-            <MetaCard title="غیرفعال / قرنطینه" value={formatNumber(ipSummary?.inactive)} note="فیلترشده · خارج از استخر" />
-            <MetaCard title="متصل به سرور حذف‌شده" value={formatNumber(ipSummary?.stale)} note="نیازمند بازپس‌گیری" />
-            <MetaCard title="رنج آی‌پی" value={formatNumber(ipSummary?.range_count)} note="بلوک‌های پیوسته" />
+            <MetaCard title="کل آی‌پی ایران" value={formatNumber(ipSummary?.iran_total)} note="شاتل تهران — ۹۴٫۱۸۲" highlight />
+            <MetaCard title="اختصاص‌یافته" value={formatNumber(ipSummary?.iran_assigned)} note="به سرور کاربر فعال" />
+            <MetaCard title="آزاد (استخر ایران)" value={formatNumber(ipSummary?.iran_free)} note="قابل اختصاص" />
+            <MetaCard title="غیرفعال / قرنطینه ایران" value={formatNumber(ipSummary?.iran_inactive)} note="فیلترشده · خارج از استخر" />
+            <MetaCard title="متصل به سرور حذف‌شده" value={formatNumber(ipSummary?.iran_stale)} note="نیازمند بازپس‌گیری" />
+            <MetaCard
+              title="خارج از ایران (بدون سرویس)"
+              value={formatNumber(ipSummary?.foreign_total)}
+              note={ipSummary?.foreign_free ? `${formatNumber(ipSummary.foreign_free)} ردیف آزاد بی‌فایده` : "هلند · فرانسه · آلمان"}
+            />
           </div>
 
-          {ipSummary?.ranges.length ? (
+          <p className="text-xs text-slate-400">
+            فقط {formatNumber(ipSummary?.iran_total)} آی‌پی {formatNumber(ipSummary?.iran_range_count)} رنج شاتل تهران (۹۴٫۱۸۲٫۹۴٫۰–۶۳ و ۹۴٫۱۸۲٫۱۷۲٫۶۴–۱۲۷) قابل اختصاص است؛
+            {" "}{formatNumber(ipSummary?.foreign_total)} آی‌پی دیگر (هلند، فرانسه، آلمان و رنج‌های بازنشستهٔ ۹۴٫۱۸۲) سرویس فعال ندارند و فقط برای سابقه نگه‌داری می‌شوند.
+          </p>
+
+          {ipSummary?.iran_ranges.length ? (
             <div>
-              <p className="mb-2 text-sm font-medium text-slate-600">
-                رنج‌های آی‌پی — از چه آی‌پی تا چه آی‌پی ({formatNumber(ipSummary.ranges.length)} رنج):
-              </p>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-slate-600">
+                  رنج‌های آی‌پی ایران — از چه آی‌پی تا چه آی‌پی ({formatNumber(ipSummary.iran_ranges.length)} رنج):
+                </p>
+                {ipSummary.foreign_ranges.length ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowForeignRanges((value) => !value)}
+                    className="text-xs text-slate-500 underline decoration-dotted hover:text-slate-700"
+                  >
+                    {showForeignRanges
+                      ? "بستن رنج‌های خارجی"
+                      : `نمایش رنج‌های خارجی (${formatNumber(ipSummary.foreign_range_count)})`}
+                  </button>
+                ) : null}
+              </div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {ipSummary.ranges.map((range) => (
-                  <div key={`${range.from}-${range.to}`} className="rounded-xl border border-slate-200 bg-white p-3" dir="ltr">
+                {ipSummary.iran_ranges.map((range) => (
+                  <div key={`${range.from}-${range.to}`} className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3" dir="ltr">
                     <p className="font-mono text-sm font-medium text-slate-800">
                       {range.from} <span className="text-slate-400">→</span> {range.to}
                     </p>
                     <p className="mt-1 text-[11px] text-slate-400">{faNumber.format(range.count)} آی‌پی</p>
                     <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]" dir="rtl">
                       <span className="text-emerald-600">اختصاصی {faNumber.format(range.assigned)}</span>
+                      <span className="text-sky-600">آزاد {faNumber.format(range.free)}</span>
+                      {range.inactive ? <span className="text-rose-600">قرنطینه {faNumber.format(range.inactive)}</span> : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {ipSummary?.foreign_ranges.length && showForeignRanges ? (
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-500">
+                رنج‌های خارجی (بدون سرویس — {formatNumber(ipSummary.foreign_range_count)} رنج):
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {ipSummary.foreign_ranges.map((range) => (
+                  <div key={`${range.from}-${range.to}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3" dir="ltr">
+                    <p className="font-mono text-sm text-slate-600">
+                      {range.from} <span className="text-slate-400">→</span> {range.to}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-400">{faNumber.format(range.count)} آی‌پی</p>
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]" dir="rtl">
                       <span className="text-sky-600">آزاد {faNumber.format(range.free)}</span>
                       {range.inactive ? <span className="text-rose-600">قرنطینه {faNumber.format(range.inactive)}</span> : null}
                     </div>
@@ -808,6 +870,18 @@ export default function HaioflashPage() {
                 className="pr-9"
               />
             </div>
+            <select
+              value={ipGeo}
+              onChange={(event) => {
+                setIpGeo(event.target.value)
+                setIpPage(1)
+              }}
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
+            >
+              <option value="iran">آی‌پی‌های ایران (شاتل)</option>
+              <option value="foreign">خارج از ایران (بدون سرویس)</option>
+              <option value="">همه آی‌پی‌ها</option>
+            </select>
             <select
               value={ipState}
               onChange={(event) => {
@@ -865,6 +939,14 @@ export default function HaioflashPage() {
                         <td className="px-4 py-3">
                           <span className={cn("inline-block rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap", meta?.chip ?? "bg-slate-100 text-slate-600")}>
                             {meta?.label ?? ip.state}
+                          </span>
+                          <span
+                            className={cn(
+                              "mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
+                              ip.geo === "iran" ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-700",
+                            )}
+                          >
+                            {ip.geo === "iran" ? "ایران (شاتل)" : "خارج — بدون سرویس"}
                           </span>
                           {ip.is_ipv6 ? <p className="mt-1 text-[10px] text-slate-400">IPv6</p> : null}
                         </td>
