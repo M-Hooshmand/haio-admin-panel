@@ -151,9 +151,9 @@ const VERIFICATION_LABELS: Record<VerificationLevel, string> = {
 }
 
 const ORDERINGS = [
-  { value: "activity", label: "همه با هم — جدیدترین ورود/ثبت‌نام" },
-  { value: "created", label: "تاریخ ثبت‌نام" },
-  { value: "login", label: "آخرین ورود" },
+  { value: "created", label: "تاریخ ثبت‌نام — جدیدترین بالا (پیش‌فرض)" },
+  { value: "activity", label: "آخرین فعالیت (ثبت‌نام/لاگین)" },
+  { value: "login", label: "فقط آخرین لاگین" },
   { value: "verified", label: "وضعیت احراز: احرازشده‌ها اول" },
   { value: "unverified", label: "وضعیت احراز: احرازنشده‌ها اول" },
   { value: "payments", label: "بیشترین پرداختی" },
@@ -349,7 +349,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("")
   const [verification, setVerification] = useState("")
   const [services, setServices] = useState("")
-  const [ordering, setOrdering] = useState("activity")
+  const [ordering, setOrdering] = useState("created")
 
   const [selected, setSelected] = useState<CustomerRow | null>(null)
 
@@ -419,8 +419,10 @@ export default function UsersPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-slate-500">
-            همه کاربران بر اساس جدیدترین ثبت‌نام یا ورود مرتب شده‌اند. سبز یعنی کاربر
-            شماره/ایمیل یا هویت خود را تایید کرده است.
+            فقط مشتریان (بدون حساب‌های پنل) بر اساس تاریخ ثبت‌نام مرتب شده‌اند؛
+            جدیدترین ثبت‌نام بالای فهرست و قدیمی‌ترین در انتها است. احرازشده و
+            احرازنشده با هم نمایش داده می‌شوند و کاربر تاییدشده با رنگ سبز مشخص
+            می‌شود.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={refreshAll} disabled={loading}>
@@ -536,7 +538,7 @@ export default function UsersPage() {
                 <th className="px-4 py-3 font-medium">پرداختی</th>
                 <th className="px-4 py-3 font-medium">سرویس‌ها</th>
                 <th className="px-4 py-3 font-medium">وضعیت احراز</th>
-                <th className="px-4 py-3 font-medium">آخرین ورود</th>
+                <th className="px-4 py-3 font-medium">آخرین لاگین</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -802,7 +804,7 @@ function CustomerDrawer({ customer, onClose }: { customer: CustomerRow; onClose:
                 <span className="font-mono">#{data.id}</span>
                 {data.username ? <span>{data.username}</span> : null}
                 <span>ثبت‌نام {formatDate(data.created_at)}</span>
-                <span>آخرین ورود {formatDateTime(data.last_login)}</span>
+                <span>آخرین لاگین {formatDateTime(data.last_login)}</span>
               </div>
             </div>
           </div>
