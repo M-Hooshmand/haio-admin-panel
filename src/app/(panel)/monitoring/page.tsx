@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   CalendarDays,
   CircleDot,
+  Compass,
   Globe,
   Loader2,
   Phone,
@@ -31,6 +32,9 @@ interface MonitoringUser {
   last_seen: number | null
   last_seen_label: string
   is_online: boolean
+  current_section: string
+  current_path?: string
+  section_last_seen: number | null
 }
 
 interface ActivitySnapshot {
@@ -53,6 +57,22 @@ const ROLE_LABELS: Record<string, string> = {
   SALES: "فروش",
   FINANCE: "مالی",
   TECHNICAL: "فنی",
+}
+
+const SECTION_LABELS: Record<string, string> = {
+  dashboard: "داشبورد",
+  users: "کاربران",
+  organizations: "سازمان‌ها",
+  subscriptions: "اشتراک‌ها",
+  invoices: "فاکتورها",
+  proforma: "پیش‌فاکتورها",
+  haioflash: "هایوفلش",
+  haiogate: "هایوگیت",
+  monitoring: "مونیتورینگ کاربران",
+  tickets: "تیکت‌ها",
+  campaigns: "کمپین‌ها",
+  reports: "گزارش‌ها",
+  settings: "تنظیمات",
 }
 
 const REFRESH_INTERVAL_MS = 30_000
@@ -97,14 +117,25 @@ function extractError(error: unknown): string {
 function UserRow({
   user,
   online,
+  onlineTtlMinutes,
 }: {
   user: MonitoringUser
   online: boolean
+  onlineTtlMinutes: number
 }) {
   const name =
     user.display_name && user.display_name !== user.username
       ? user.display_name
       : user.username
+
+  const sectionRaw = (user.current_section || "").trim()
+  const sectionLabel = sectionRaw ? SECTION_LABELS[sectionRaw] ?? sectionRaw : null
+  const sectionFresh =
+    sectionLabel !== null &&
+    user.section_last_seen !== null &&
+    user.section_last_seen !== undefined &&
+    online &&
+    user.section_last_seen <= onlineTtlMinutes * 60
 
   return (
     <div
@@ -141,6 +172,20 @@ function UserRow({
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
             {ROLE_LABELS[user.role] ?? user.role}
           </span>
+          {sectionLabel ? (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                sectionFresh
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-slate-100 text-slate-500",
+              )}
+              title={user.current_path || undefined}
+            >
+              <Compass className="h-3 w-3" />
+              {sectionFresh ? `الان در: ${sectionLabel}` : `آخرین بخش: ${sectionLabel}`}
+            </span>
+          ) : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-slate-500">
           <span className="inline-flex items-center gap-1">
@@ -183,10 +228,12 @@ function UserList({
   users,
   name,
   icon,
+  onlineTtlMinutes,
 }: {
   users: MonitoringUser[]
   name: string
   icon: React.ReactNode
+  onlineTtlMinutes: number
 }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
@@ -205,7 +252,12 @@ function UserList({
       ) : (
         <div className="space-y-2">
           {users.map((user) => (
-            <UserRow key={user.id} user={user} online={user.is_online} />
+            <UserRow
+              key={user.id}
+              user={user}
+              online={user.is_online}
+              onlineTtlMinutes={onlineTtlMinutes}
+            />
           ))}
         </div>
       )}
@@ -347,6 +399,7 @@ export default function MonitoringPage() {
           <UserList
             users={online}
             name="حالا آنلاین"
+            onlineTtlMinutes={snapshot?.online_ttl_minutes ?? 10}
             icon={
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
                 <CircleDot className="h-4 w-4" />
@@ -356,6 +409,7 @@ export default function MonitoringPage() {
           <UserList
             users={today}
             name="بقیه کاربران فعال امروز"
+            onlineTtlMinutes={snapshot?.online_ttl_minutes ?? 10}
             icon={
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
                 <CalendarDays className="h-4 w-4" />
