@@ -112,6 +112,36 @@ function StatusBadge({ status }: { status: AiTask["status"] }) {
   )
 }
 
+const OUTPUT_PREVIEW_CHARS = 6000
+
+function LongText({ text, ltr = true }: { text: string; ltr?: boolean }) {
+  const [full, setFull] = useState(false)
+  const tooLong = text.length > OUTPUT_PREVIEW_CHARS
+  const shown = tooLong && !full ? `${text.slice(0, OUTPUT_PREVIEW_CHARS)}…` : text
+  return (
+    <div>
+      <pre
+        dir={ltr ? "ltr" : undefined}
+        className={cn(
+          "max-h-96 overflow-y-auto whitespace-pre-wrap break-words font-mono text-left text-xs leading-5 text-slate-800",
+          !ltr && "text-right",
+        )}
+      >
+        {shown}
+      </pre>
+      {tooLong && (
+        <button
+          type="button"
+          onClick={() => setFull(!full)}
+          className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+        >
+          {full ? "بستن" : `نمایش کامل (${text.length.toLocaleString("fa-IR")} کاراکتر)`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function TaskCard({ task, defaultOpen }: { task: AiTask; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   const active = task.status === "queued" || task.status === "running"
@@ -143,10 +173,12 @@ function TaskCard({ task, defaultOpen }: { task: AiTask; defaultOpen: boolean })
       </button>
       {open && (
         <div className="border-t border-slate-100 px-4 pb-4 pt-3">
-          {task.error && (
+          {task.status === "failed" && task.error && (
             <div className="mb-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-100">
               <p className="font-medium">خطا</p>
-              <p className="mt-1 whitespace-pre-wrap break-words">{task.error}</p>
+              <div className="mt-1">
+                <LongText text={task.error} />
+              </div>
             </div>
           )}
           <div className="rounded-xl bg-slate-50 p-3">
@@ -154,9 +186,7 @@ function TaskCard({ task, defaultOpen }: { task: AiTask; defaultOpen: boolean })
               <Bot className="h-3.5 w-3.5" /> خروجی هوش مصنوعی
             </p>
             {task.output ? (
-              <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-slate-800">
-                {task.output}
-              </pre>
+              <LongText text={task.output} ltr={false} />
             ) : (
               <p className="text-sm text-slate-400">
                 {active ? "در حال اجراست…" : "خروجی ثبت نشده است."}
