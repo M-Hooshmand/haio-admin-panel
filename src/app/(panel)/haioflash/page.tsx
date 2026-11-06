@@ -84,6 +84,13 @@ interface FlashVm {
   }
   plan: FlashPlan
   node: FlashNode
+  ip_shared: {
+    id: string
+    name: string
+    short_id: string
+    status: string
+    status_display: string
+  } | null
   image: string | null
   traffic: FlashTraffic
   expired_at: string | null
@@ -191,6 +198,59 @@ interface IpPage {
   generated_at: string
   summary: IpSummary
   results: FlashIp[]
+}
+
+interface HistClaim {
+  id: string
+  name: string
+  short_id: string
+  machine_no: number | null
+  microvm_id: string
+  status: string
+  status_display: string
+  owner: FlashOwner
+  organization: FlashOrg
+  node: string
+  region: string
+  plan: string
+  traffic_used_bytes: number
+  created_at: string
+  ended_at: string | null
+  is_current: boolean
+  is_dead: boolean
+}
+
+interface HistEvent {
+  id: string
+  vm: string
+  short_id: string
+  type: string
+  type_display: string
+  description: string
+  created_at: string
+}
+
+interface HistPool {
+  is_active: boolean
+  state: string
+  mac: string
+  gateway: string | null
+  region: string | null
+  node: string | null
+}
+
+interface HistPayload {
+  address: string
+  geo: "iran" | "foreign"
+  ip_found: boolean
+  pool: HistPool | null
+  current: HistClaim | null
+  claims: HistClaim[]
+  claim_count: number
+  live_claim_count: number
+  note: string
+  events: HistEvent[]
+  generated_at: string
 }
 
 const PAGE_SIZE = 25
@@ -464,9 +524,10 @@ export default function HaioflashPage() {
     [user],
   )
 
-  const [tab, setTab] = useState<"vms" | "ips">("vms")
+  const [tab, setTab] = useState<"vms" | "ips" | "history">("vms")
   const fetchVmsRef = useRef(0)
   const fetchIpsRef = useRef(0)
+  const fetchHistRef = useRef(0)
 
   // --- machines -----------------------------------------------------------
   const [searchInput, setSearchInput] = useState("")
@@ -488,6 +549,13 @@ export default function HaioflashPage() {
   const [ipData, setIpData] = useState<IpPage | null>(null)
   const [ipLoading, setIpLoading] = useState(false)
   const [ipError, setIpError] = useState("")
+
+  // --- IP history ---------------------------------------------------------
+  const [histInput, setHistInput] = useState("")
+  const [histAddress, setHistAddress] = useState("")
+  const [histData, setHistData] = useState<HistPayload | null>(null)
+  const [histLoading, setHistLoading] = useState(false)
+  const [histError, setHistError] = useState("")
 
   // debounce both searches
   useEffect(() => {
@@ -554,6 +622,29 @@ export default function HaioflashPage() {
     }
   }, [allowed, ipPage, ipSearch, ipState, ipGeo])
 
+  const fetchHistory = useCallback(async () => {
+    if (!allowed || !histAddress) return
+    const requestId = ++fetchHistRef.current
+    setHistLoading(true)
+    setHistError("")
+    try {
+      const resp = await api.get<HistPayload>("/panel/haioflash/ip-history/", {
+        params: { address: histAddress },
+      })
+      if (fetchHistRef.current !== requestId) return
+      setHistData(resp.data)
+    } catch (error) {
+      if (fetchHistRef.current === requestId) setHistError(extractError(error))
+    } finally {
+      if (fetchHistRef.current === requestId) setHistLoading(false)
+    }
+  }, [allowed, histAddress])
+
+  useEffect(() => {
+    if (tab !== "history" || !histAddress) return
+    void fetchHistory()
+  }, [tab, fetchHistory])
+
   useEffect(() => {
     void fetchVms()
   }, [fetchVms])
@@ -590,14 +681,18 @@ export default function HaioflashPage() {
           <h1 className="text-xl font-semibold text-slate-800">هایوفلش</h1>
           <p className="mt-1 text-sm text-slate-500">
             کل سرورهای ابری کاربران — شماره ماشین، مالک، آی‌پی، اطلاعات ورود، تاریخ ساخت و انقضا، مصرف ترافیک و پلن.
-            زیرتب «موجودی آی‌پی» وضعیت کامل استخر آی‌پی و رنج‌ها را نشان می‌دهد.
+            زیرتب «موجودی آی‌پی» وضعیت کامل استخر آی‌پی و رنج‌ها را نشان می‌دهد و زیرتب «سوابق آی‌پی» تاریخچهٔ مالکیت هر آی‌پی.
           </p>
           {vmData ? (
             <p className="mt-1 text-xs text-slate-400">آخرین بروزرسانی: {formatDateTime(vmData.generated_at)}</p>
           ) : null}
         </div>
-        <Button variant="outline" onClick={() => (tab === "vms" ? fetchVms() : fetchIps())} disabled={vmLoading || ipLoading}>
-          <RefreshCw className={cn("size-4", (tab === "vms" ? vmLoading : ipLoading) && "animate-spin")} />
+        <Button
+          variant="outline"
+          onClick={() => (tab === "vms" ? fetchVms() : tab === "ips" ? fetchIps() : fetchHistory())}
+          disabled={vmLoading || ipLoading || histLoading}
+        >
+          <RefreshCw className={cn("size-4", (tab === "vms" ? vmLoading : tab === "ips" ? ipLoading : histLoading) && "animate-spin")} />
           بروزرسانی
         </Button>
       </div>
@@ -623,6 +718,16 @@ export default function HaioflashPage() {
           )}
         >
           موجودی آی‌پی
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("history")}
+          className={cn(
+            "rounded-lg px-4 py-1.5 text-sm font-medium transition",
+            tab === "history" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50",
+          )}
+        >
+          سوابق آی‌پی
         </button>
       </div>
 
@@ -745,6 +850,11 @@ export default function HaioflashPage() {
                           {vm.network.ipv6 ? <p className="font-mono text-[10px] text-slate-400">{vm.network.ipv6}</p> : null}
                           <p className="font-mono text-[10px] text-slate-400">{vm.network.mac}</p>
                           <p className="text-[10px] text-slate-400" dir="rtl">{vm.node.name} · {vm.node.region}</p>
+                          {vm.ip_shared ? (
+                            <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700" dir="rtl">
+                              ردیف تکراری — «{vm.ip_shared.name}» هم این آی‌پی را دارد ({vm.ip_shared.status_display}) — سابقه را در زیرتب «سوابق آی‌پی» ببینید
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3"><CredentialCell vm={vm} /></td>
                         <td className="px-4 py-3">
@@ -782,7 +892,7 @@ export default function HaioflashPage() {
             </div>
           </div>
         </section>
-      ) : (
+      ) : tab === "ips" ? (
         <section className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <MetaCard title="کل آی‌پی ایران" value={formatNumber(ipSummary?.iran_total)} note="شاتل تهران — ۹۴٫۱۸۲" highlight />
@@ -1000,6 +1110,191 @@ export default function HaioflashPage() {
               </Button>
             </div>
           </div>
+        </section>
+      ) : (
+        <section className="space-y-4">
+          {/* IP history lookup */}
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+            <Input
+              value={histInput}
+              onChange={(event) => setHistInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") setHistAddress(histInput.trim())
+              }}
+              placeholder="آدرس آی‌پی را وارد کنید… مثلاً 94.182.94.50"
+              dir="ltr"
+              className="min-w-[260px] flex-1 font-mono text-left"
+            />
+            <Button size="sm" onClick={() => setHistAddress(histInput.trim())} disabled={histLoading}>
+              {histLoading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+              بررسی
+            </Button>
+            {histAddress ? (
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-600" dir="ltr">
+                {histAddress}
+              </span>
+            ) : null}
+          </div>
+
+          {histError ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{histError}</div>
+          ) : null}
+
+          {!histData && !histLoading && !histError ? (
+            <p className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+              آی‌پی یک سرور را وارد کنید تا مشخص شود الان دست چه کسی است و پیش‌تر در چه تاریخ‌هایی دست کدام کاربر بوده است.
+            </p>
+          ) : null}
+
+          {histData ? (
+            <>
+              <div>
+                <p className="text-sm font-medium text-slate-600">
+                  وضعیت فعلی {histData.geo === "iran" ? "(ایران — شاتل)" : "(خارج از ایران — بدون سرویس)"}
+                </p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {histData.current ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+                      <p className="text-xs text-emerald-700">در حال حاضر دست</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-800">{ownerName(histData.current.owner)}</p>
+                      {histData.current.owner.mobile ? (
+                        <p className="text-xs text-slate-500" dir="ltr">{histData.current.owner.mobile}</p>
+                      ) : null}
+                      {histData.current.owner.email ? (
+                        <p className="text-[11px] text-slate-400" dir="ltr">{histData.current.owner.email}</p>
+                      ) : null}
+                      <p className="mt-1.5 text-xs text-slate-600">
+                        سرور «{histData.current.name}» — {histData.current.status_display}
+                        {histData.current.microvm_id ? <span className="text-slate-400" dir="ltr"> · {histData.current.microvm_id.slice(0, 12)}</span> : null}
+                      </p>
+                      <p className="text-[11px] text-slate-400">{histData.current.node} · {histData.current.region}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        از تاریخ {formatDate(histData.current.created_at)}
+                        {histData.current.ended_at ? ` تا ${formatDate(histData.current.ended_at)}` : " تاکنون"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs text-slate-500">مالک فعلی</p>
+                      <p className="mt-1 text-sm text-slate-600">الان دست هیچ سروری نیست</p>
+                      {histData.pool ? (
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          وضعیت استخر: {histData.pool.is_active ? "فعال" : "غیرفعال / قرنطینه"} · {histData.pool.state}
+                          {histData.pool.region ? ` · ${histData.pool.region}` : ""}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-slate-400">این آی‌پی در استخر ثبت نشده است.</p>
+                      )}
+                    </div>
+                  )}
+                  <MetaCard title="تعداد سابقه‌های ثبت‌شده" value={formatNumber(histData.claim_count)} note={`${formatNumber(histData.live_claim_count)} ردیف زنده`} />
+                  <MetaCard title="رخدادهای ثبت‌شده" value={formatNumber(histData.events.length)} note="روشن/خاموش، تغییر آی‌پی و…" />
+                </div>
+              </div>
+
+              {histData.note ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">{histData.note}</div>
+              ) : null}
+
+              <div>
+                <p className="text-sm font-medium text-slate-600">
+                  سابقهٔ مالکیت {histData.address} ({formatNumber(histData.claim_count)} ردیف):
+                </p>
+                <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="min-w-[900px] w-full text-right text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                        <th className="px-4 py-3 font-medium">از تاریخ</th>
+                        <th className="px-4 py-3 font-medium">تا تاریخ</th>
+                        <th className="px-4 py-3 font-medium">برای چه کسی</th>
+                        <th className="px-4 py-3 font-medium">سرور</th>
+                        <th className="px-4 py-3 font-medium">وضعیت ردیف</th>
+                        <th className="px-4 py-3 font-medium">نود / ناحیه</th>
+                        <th className="px-4 py-3 font-medium">مصرف ترافیک</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {histData.claims.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                            سابقه‌ای برای این آی‌پی ثبت نشده است.
+                          </td>
+                        </tr>
+                      ) : (
+                        histData.claims.map((claim) => {
+                          const meta = VM_STATUS[claim.status]
+                          return (
+                            <tr key={claim.id} className={cn("border-b border-slate-100 align-top last:border-0", claim.is_current && "bg-emerald-50/40")}>
+                              <td className="px-4 py-3 text-xs text-slate-600">{formatDate(claim.created_at)}</td>
+                              <td className="px-4 py-3 text-xs text-slate-600">{claim.ended_at ? formatDate(claim.ended_at) : <span className="font-medium text-emerald-600">تاکنون</span>}</td>
+                              <td className="px-4 py-3">
+                                <p className="text-slate-800">{ownerName(claim.owner)}</p>
+                                <p className="text-[11px] text-slate-400">{claim.organization.name}</p>
+                                {claim.owner.mobile ? <p className="text-[11px] text-slate-400" dir="ltr">{claim.owner.mobile}</p> : null}
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="font-medium text-slate-700">{claim.name}</p>
+                                <p className="text-[11px] text-slate-400" dir="ltr">
+                                  {claim.microvm_id ? claim.microvm_id.slice(0, 12) : claim.short_id}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={cn("inline-block rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap", meta?.chip ?? "bg-slate-100 text-slate-600")}>
+                                  {meta?.label ?? claim.status_display}
+                                </span>
+                                {claim.is_current ? (
+                                  <span className="mt-1 block text-[10px] font-medium text-emerald-600">مالک فعلی</span>
+                                ) : null}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-slate-500">
+                                {claim.node}
+                                <p className="text-[11px] text-slate-400">{claim.region}</p>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-slate-500">{formatBytes(claim.traffic_used_bytes)}</td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-slate-600">رخدادهای سرورهای مرتبط با این آی‌پی:</p>
+                <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="min-w-[760px] w-full text-right text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                        <th className="px-4 py-3 font-medium">تاریخ</th>
+                        <th className="px-4 py-3 font-medium">سرور</th>
+                        <th className="px-4 py-3 font-medium">رخداد</th>
+                        <th className="px-4 py-3 font-medium">توضیح</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {histData.events.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-12 text-center text-slate-400">
+                            برای سرورهای این آی‌پی رخدادی ثبت نشده است.
+                          </td>
+                        </tr>
+                      ) : (
+                        histData.events.map((event) => (
+                          <tr key={event.id} className="border-b border-slate-100 align-top last:border-0">
+                            <td className="px-4 py-3 text-xs text-slate-600">{formatDateTime(event.created_at)}</td>
+                            <td className="px-4 py-3 text-xs text-slate-600">{event.vm}</td>
+                            <td className="px-4 py-3 text-xs text-slate-700">{event.type_display}</td>
+                            <td className="px-4 py-3 text-xs text-slate-500" dir="ltr">{event.description}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          ) : null}
         </section>
       )}
     </div>
