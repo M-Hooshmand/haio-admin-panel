@@ -73,6 +73,19 @@ const SECTION_LABELS: Record<string, string> = {
   campaigns: "کمپین‌ها",
   reports: "گزارش‌ها",
   settings: "تنظیمات",
+  // my.haio.ir (buyer panel) route groups
+  projects: "پروژه‌ها",
+  applications: "اپلیکیشن‌ها",
+  environments: "محیط‌ها",
+  deployments: "استقرارها",
+  domains: "دامنه‌ها",
+  billing: "حساب و قبوض",
+  marketplace: "مارکت‌پلیس",
+  notifications: "اعلان‌ها",
+  profile: "پروفایل",
+  slides: "اسلایدها",
+  support: "پشتیبانی",
+  invitations: "دعوت‌نامه‌ها",
 }
 
 const REFRESH_INTERVAL_MS = 30_000
