@@ -18,6 +18,7 @@ import {
   FileText,
   Settings,
   ShieldAlert,
+  Sparkles,
   ShieldCheck,
   Ticket,
   Users,
@@ -41,6 +42,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   tickets: Ticket,
   campaigns: Megaphone,
   monitoring: Activity,
+  assistant: Sparkles,
   reports: BarChart3,
   settings: Settings,
 }
