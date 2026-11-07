@@ -191,7 +191,7 @@ interface IpSummary {
   stopped: number
   suspended: number
   vm_claim_count: number
-  duplicate_addresses: null | Array<{ address: string; names: string[] }>
+  duplicate_addresses: null | Array<string | { address: string; names: string[] }>
   ranges: IpRange[]
   range_count: number
 }
@@ -1055,7 +1055,13 @@ export default function HaioflashPage() {
               {ipSummary.duplicate_addresses?.length ? (
                 <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
                   هشدار: {formatNumber(ipSummary.duplicate_addresses.length)} آی‌پی بیش از یک ردیف زنده دارد —{" "}
-                  {ipSummary.duplicate_addresses.map((d) => `${d.address} (${d.names.join(" و ")})`).join("، ")}. ردیف‌های تکراری نیازمند پاکسازی‌اند.
+                  {ipSummary.duplicate_addresses
+                    .map((d) => {
+                      const addr = typeof d === "string" ? d : (d as { address?: string }).address ?? "";
+                      const names: string[] = typeof d === "string" ? [] : ((d as { names?: string[] }).names ?? []);
+                      return names.length ? `${addr} (${names.join(" و ")})` : addr;
+                    })
+                    .join("، ")}. ردیف‌های تکراری نیازمند پاکسازی‌اند.
                 </p>
               ) : null}
             </div>
