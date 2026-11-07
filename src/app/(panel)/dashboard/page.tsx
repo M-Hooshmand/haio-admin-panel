@@ -176,12 +176,17 @@ export default function DashboardPage() {
     return map
   }, [labels])
 
+  const activeCampaigns = useMemo(
+    () => (data?.campaigns ?? []).filter((campaign) => campaign.sent > 0),
+    [data]
+  )
+
   const bands: ChartBand[] = useMemo(() => {
     if (!data) return []
     // Many campaigns share the same send day — merge them into one band so the
     // shaded area does not stack its opacity 40 times.
     const grouped = new Map<string, { start: number; end: number; names: string[] }>()
-    for (const campaign of data.campaigns) {
+    for (const campaign of activeCampaigns) {
       if (!campaign.start_date || !campaign.end_date) continue
       const start = indexByDate.get(campaign.start_date)
       const end = indexByDate.get(campaign.end_date)
@@ -196,7 +201,7 @@ export default function DashboardPage() {
       end: band.end,
       label: band.names.join(" · "),
     }))
-  }, [data, indexByDate])
+  }, [data, indexByDate, activeCampaigns])
 
   const displayName =
     user?.display_name ||
@@ -312,8 +317,8 @@ export default function DashboardPage() {
             />
             <KpiCard
               title="کمپین‌های بازه"
-              value={faNum(data.kpis.campaigns)}
-              hint={`${faNum(data.campaign_days.length)} روز کمپین`}
+              value={faNum(activeCampaigns.length)}
+              hint={`${faNum(data.campaign_days.length)} روز ارسال · ${faNum(data.kpis.campaigns)} کمپین ثبت‌شده`}
               icon={Megaphone}
               tone="text-fuchsia-600"
             />
@@ -517,8 +522,8 @@ export default function DashboardPage() {
             subtitle="هر کمپین با ثبت‌نام، خرید و درآمد روزهایی که پیام ارسال شده مقایسه می‌شود."
             icon={Megaphone}
           >
-            {data.campaigns.length ? (
-              <div className="overflow-x-auto">
+            {activeCampaigns.length ? (
+              <div className="max-h-[460px] overflow-auto rounded-xl border border-slate-100">
                 <table className="w-full min-w-[820px] text-right text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 text-[11px] text-slate-500">
@@ -534,7 +539,7 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.campaigns.map((campaign) => (
+                    {activeCampaigns.map((campaign) => (
                       <tr key={campaign.id} className="border-b border-slate-50 hover:bg-slate-50/60">
                         <td className="max-w-[220px] truncate py-2.5 font-medium text-slate-800" title={campaign.name}>
                           {campaign.name}

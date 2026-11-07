@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 export type ChartBand = { start: number; end: number; label?: string }
 
 const FA = new Intl.NumberFormat("fa-IR")
+const FA1 = new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 1 })
 
 export function faNum(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
@@ -24,9 +25,9 @@ export function faToman(value: number | null | undefined): string {
 }
 
 export function faCompact(value: number): string {
-  if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)} میلیارد`
-  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} میلیون`
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)} هزار`
+  if (Math.abs(value) >= 1_000_000_000) return `${FA1.format(value / 1_000_000_000)} میلیارد`
+  if (Math.abs(value) >= 1_000_000) return `${FA1.format(value / 1_000_000)} میلیون`
+  if (Math.abs(value) >= 1_000) return `${FA.format(Math.round(value / 1_000))} هزار`
   return FA.format(value)
 }
 
