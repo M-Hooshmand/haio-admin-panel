@@ -334,7 +334,7 @@ export default function DashboardPage() {
           {/* Signups + verification */}
           <ChartCard
             title="ثبت‌نام و احراز هویت روزانه"
-            subtitle="ثبت‌نام‌های جدید و احراز هویت‌های موفق (شاهکار) در هر روز — نوارهای بنفش، روزهای کمپین هستند."
+            subtitle="ثبت‌نام‌های جدید و تعداد نفراتی از همان ثبت‌نام‌ها که احراز هویت (شاهکار) کرده‌اند — نوارهای بنفش، روزهای کمپین هستند."
             icon={Users}
           >
             <TimeSeriesChart
@@ -350,7 +350,7 @@ export default function DashboardPage() {
                 },
                 {
                   key: "verified",
-                  label: "احراز هویت",
+                  label: "احراز‌شده از ثبت‌نام‌ها",
                   color: "#0d9488",
                   values: data.signups_daily.map((row) => row.verified),
                 },
