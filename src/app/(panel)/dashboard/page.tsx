@@ -9,6 +9,8 @@ import {
   Megaphone,
   ReceiptText,
   RefreshCw,
+  Server,
+  ShieldCheck,
   Ticket,
   TrendingUp,
   UserPlus,
@@ -25,6 +27,7 @@ import {
   HBarList,
   faCompact,
   faDay,
+  faMonth,
   faNum,
   faToman,
   type ChartBand,
@@ -41,7 +44,11 @@ interface Kpis {
   open_tickets: number
   logins_today: number
   users_today: number
+  logins_unique: number
+  logins_returning: number
   campaigns: number
+  active_services: number
+  admin_services: number
 }
 
 interface DailySignup {
@@ -62,6 +69,38 @@ interface DailyRevenue {
   paid_amount: number
   pending_count: number
   pending_amount: number
+}
+
+interface MonthlyRevenue {
+  month: string
+  paid_count: number
+  paid_amount: number
+  pending_count: number
+  pending_amount: number
+}
+
+interface RevenueProduct {
+  key: string
+  label: string
+  count: number
+  amount: number
+}
+
+interface ServiceRow {
+  key: string
+  label: string
+  available: boolean
+  total: number | null
+  active: number | null
+}
+
+interface AdminServiceUser {
+  id: number
+  name: string
+  email: string
+  role: string
+  total: number
+  active: number
 }
 
 interface Money {
@@ -110,8 +149,17 @@ interface DashboardData {
   signups_daily: DailySignup[]
   logins_daily: DailyLogin[]
   revenue_daily: DailyRevenue[]
-  revenue_by_product: { key: string; label: string; count: number; amount: number }[]
+  revenue_monthly: MonthlyRevenue[]
+  revenue_by_product: RevenueProduct[]
+  revenue_by_product_monthly: { month: string; products: RevenueProduct[] }[]
   products: ProductRow[]
+  services: ServiceRow[]
+  admin_services: {
+    total: number
+    active: number
+    by_product: ServiceRow[]
+    users: AdminServiceUser[]
+  }
   invoices: {
     issued: Money
     attempted: Money
@@ -148,6 +196,8 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [revenueMode, setRevenueMode] = useState<"daily" | "monthly">("daily")
+  const [productMonth, setProductMonth] = useState<string>("latest")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -203,6 +253,22 @@ export default function DashboardPage() {
     }))
   }, [data, indexByDate, activeCampaigns])
 
+  const monthOptions = useMemo(
+    () => (data?.revenue_by_product_monthly ?? []).map((row) => row.month),
+    [data]
+  )
+  const latestMonth = monthOptions[monthOptions.length - 1]
+  const activeMonth =
+    productMonth === "all"
+      ? "all"
+      : monthOptions.includes(productMonth)
+        ? productMonth
+        : latestMonth
+  const productRevenue =
+    activeMonth === "all"
+      ? data?.revenue_by_product ?? []
+      : data?.revenue_by_product_monthly.find((row) => row.month === activeMonth)?.products ?? []
+
   const displayName =
     user?.display_name ||
     [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
@@ -219,7 +285,8 @@ export default function DashboardPage() {
             <h2 className="mt-1 text-xl font-bold md:text-2xl">{displayName}</h2>
             <p className="mt-2 text-xs leading-6 text-indigo-100">
               تصویر کامل {faNum(days)} روز گذشته از ثبت‌نام، احراز هویت، محصولات،
-              فاکتورها، تیکت‌ها، کمپین‌ها و ورود کاربران به پنل.
+              فاکتورها، تیکت‌ها، کمپین‌ها و ورود کاربران به پنل. آمار فقط شامل
+              مشتریان واقعی است و حساب‌های ادمین/پشتیبانی جدا شده‌اند.
               {role ? ` دسترسی شما: ${PANEL_ROLE_LABELS[role]}.` : ""}
             </p>
           </div>
@@ -329,12 +396,26 @@ export default function DashboardPage() {
               icon={BadgeCheck}
               tone="text-teal-600"
             />
+            <KpiCard
+              title="سرویس فعال مشتریان"
+              value={faNum(data.kpis.active_services)}
+              hint="پاس، فلش، تحریم‌شکن، دسکتاپ و CDN"
+              icon={Server}
+              tone="text-cyan-600"
+            />
+            <KpiCard
+              title="سرویس‌های ادمین‌ها"
+              value={faNum(data.kpis.admin_services)}
+              hint={`${faNum(data.admin_services.active)} سرویس فعال`}
+              icon={ShieldCheck}
+              tone="text-slate-600"
+            />
           </div>
 
           {/* Signups + verification */}
           <ChartCard
             title="ثبت‌نام و احراز هویت روزانه"
-            subtitle="ثبت‌نام‌های جدید و تعداد نفراتی از همان ثبت‌نام‌ها که احراز هویت (شاهکار) کرده‌اند — نوارهای بنفش، روزهای کمپین هستند."
+            subtitle="ثبت‌نام‌های جدید مشتریان و تعداد نفراتی از همان ثبت‌نام‌ها که احراز هویت (شاهکار) کرده‌اند — نوارهای بنفش، روزهای کمپین هستند. حساب‌های ادمین در این آمار نیستند."
             icon={Users}
           >
             <GroupedBarChart
@@ -361,25 +442,67 @@ export default function DashboardPage() {
             {/* Revenue */}
             <ChartCard
               className="xl:col-span-2"
-              title="ورودی مالی روزانه"
-              subtitle="مبلغ فاکتورهای پرداخت‌شده؛ با نگه‌داشتن موس، تعداد فاکتورهای پرداختی و معلق همان روز را ببینید."
+              title="ورودی مالی"
+              subtitle="مبلغ فاکتورهای پرداخت‌شده؛ نمایش روزانه یا ماهانه. با نگه‌داشتن موس، تعداد فاکتورهای پرداختی و معلق همان بازه را ببینید."
               icon={CircleDollarSign}
             >
-              <DailyBarChart
-                labels={labels}
-                bands={bands}
-                values={data.revenue_daily.map((row) => row.paid_amount)}
-                color="#10b981"
-                formatValue={faToman}
-                extra={(index) => {
-                  const row = data.revenue_daily[index]
-                  if (!row) return []
-                  return [
-                    { label: "فاکتور پرداختی", value: faNum(row.paid_count) },
-                    { label: "فاکتور معلق", value: faNum(row.pending_count) },
-                  ]
-                }}
-              />
+              <div className="mb-3 flex w-fit items-center gap-1 rounded-xl bg-slate-100 p-1 text-[11px]">
+                <button
+                  onClick={() => setRevenueMode("daily")}
+                  className={cn(
+                    "rounded-lg px-3 py-1 font-medium transition",
+                    revenueMode === "daily"
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  روزانه
+                </button>
+                <button
+                  onClick={() => setRevenueMode("monthly")}
+                  className={cn(
+                    "rounded-lg px-3 py-1 font-medium transition",
+                    revenueMode === "monthly"
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  ماهانه
+                </button>
+              </div>
+              {revenueMode === "daily" ? (
+                <DailyBarChart
+                  labels={labels}
+                  bands={bands}
+                  values={data.revenue_daily.map((row) => row.paid_amount)}
+                  color="#10b981"
+                  formatValue={faToman}
+                  extra={(index) => {
+                    const row = data.revenue_daily[index]
+                    if (!row) return []
+                    return [
+                      { label: "فاکتور پرداختی", value: faNum(row.paid_count) },
+                      { label: "فاکتور معلق", value: faNum(row.pending_count) },
+                    ]
+                  }}
+                />
+              ) : (
+                <DailyBarChart
+                  labels={data.revenue_monthly.map((row) => row.month)}
+                  values={data.revenue_monthly.map((row) => row.paid_amount)}
+                  labelFormat={faMonth}
+                  color="#0d9488"
+                  formatValue={faToman}
+                  extra={(index) => {
+                    const row = data.revenue_monthly[index]
+                    if (!row) return []
+                    return [
+                      { label: "فاکتور پرداختی", value: faNum(row.paid_count) },
+                      { label: "فاکتور معلق", value: faNum(row.pending_count) },
+                    ]
+                  }}
+                />
+              )}
             </ChartCard>
 
             {/* Invoice funnel */}
@@ -488,10 +611,75 @@ export default function DashboardPage() {
             </ChartCard>
           </div>
 
+          <div className="grid gap-4 xl:grid-cols-2">
+            {/* Active customer services */}
+            <ChartCard
+              title="سرویس‌های فعال مشتریان"
+              subtitle="تعداد سرویس‌هایی که همین حالا فعال هستند (به تفکیک محصول)؛ فقط مشتریان، بدون سرویس‌های ادمین."
+              icon={Server}
+            >
+              <HBarList
+                items={data.services.map((service) => ({
+                  key: service.key,
+                  label: service.label,
+                  value: service.active,
+                  hint: service.available
+                    ? `از ${faNum(service.total)} سرویس ساخته‌شده`
+                    : "این محصول در دیتابیس پنل منبع داده ندارد",
+                }))}
+              />
+            </ChartCard>
+
+            {/* Admin-created services */}
+            <ChartCard
+              title="سرویس‌های ساخته‌شده توسط ادمین‌ها"
+              subtitle="حجم سرویس‌هایی که حساب‌های ادمین/پشتیبانی ساخته‌اند؛ برای جدا نگه‌داشتن آن‌ها از آمار واقعی مشتریان."
+              icon={ShieldCheck}
+            >
+              <HBarList
+                items={data.admin_services.by_product.map((service) => ({
+                  key: service.key,
+                  label: service.label,
+                  value: service.total,
+                  hint: service.available
+                    ? `فعال: ${faNum(service.active)}`
+                    : "منبع داده ثبت نشده",
+                }))}
+              />
+              {data.admin_services.users.length ? (
+                <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
+                  <table className="w-full text-right text-[11px]">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="px-2 py-1.5 font-medium">ادمین</th>
+                        <th className="px-2 py-1.5 font-medium">نقش</th>
+                        <th className="px-2 py-1.5 font-medium">سرویس</th>
+                        <th className="px-2 py-1.5 font-medium">فعال</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.admin_services.users.map((adminUser) => (
+                        <tr key={adminUser.id} className="border-t border-slate-100">
+                          <td className="px-2 py-1.5">
+                            <p className="font-medium text-slate-700">{adminUser.name}</p>
+                            <p className="text-[9px] text-slate-400">{adminUser.email}</p>
+                          </td>
+                          <td className="px-2 py-1.5 text-slate-500">{adminUser.role}</td>
+                          <td className="px-2 py-1.5 font-bold text-slate-700">{faNum(adminUser.total)}</td>
+                          <td className="px-2 py-1.5 text-emerald-600">{faNum(adminUser.active)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </ChartCard>
+          </div>
+
           {/* Logins */}
           <ChartCard
             title="ورود کاربران به پنل"
-            subtitle="تعداد ورود موفق و کاربران یکتا در هر روز. داده‌های پیش از فعال‌سازی ثبت رویداد، از آخرین ورود کاربران بازسازی شده است."
+            subtitle="تعداد ورود موفق و کاربران یکتا در هر روز؛ فقط مشتریان. داده‌های پیش از فعال‌سازی ثبت رویداد، از آخرین ورود کاربران بازسازی شده است."
             icon={Activity}
           >
             <GroupedBarChart
@@ -512,6 +700,12 @@ export default function DashboardPage() {
                 },
               ]}
             />
+            <p className="mt-3 rounded-xl bg-slate-50 p-3 text-[11px] leading-5 text-slate-500">
+              در این بازه {faNum(data.kpis.logins_unique)} مشتری یکتا وارد پنل شده‌اند؛
+              {faNum(data.kpis.logins_returning)} نفرشان قبل از این بازه ثبت‌نام کرده
+              بودند. به همین دلیل «کاربر یکتا» با «ثبت‌نام روزانه» برابر نیست: هر
+              ثبت‌نام جدید قطعاً یک ورود است، اما ورودها شامل مشتریان قدیمی هم می‌شود.
+            </p>
           </ChartCard>
 
           {/* Campaign comparison */}
@@ -585,11 +779,42 @@ export default function DashboardPage() {
           {/* Revenue by product */}
           <ChartCard
             title="درآمد به تفکیک محصول"
-            subtitle="سهم هر محصول از مبلغ فاکتورهای پرداخت‌شده در بازه."
+            subtitle={
+              activeMonth === "all"
+                ? "سهم هر محصول از مبلغ فاکتورهای پرداخت‌شده در کل بازه انتخاب‌شده."
+                : `سهم هر محصول از مبلغ فاکتورهای پرداخت‌شده در ${faMonth(activeMonth)}.`
+            }
             icon={CircleDollarSign}
           >
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setProductMonth("all")}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition",
+                  activeMonth === "all"
+                    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                )}
+              >
+                کل بازه
+              </button>
+              {[...monthOptions].reverse().map((month) => (
+                <button
+                  key={month}
+                  onClick={() => setProductMonth(month)}
+                  className={cn(
+                    "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition",
+                    activeMonth === month
+                      ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                      : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                  )}
+                >
+                  {faMonth(month)}
+                </button>
+              ))}
+            </div>
             <HBarList
-              items={data.revenue_by_product.map((row) => ({
+              items={productRevenue.map((row) => ({
                 key: row.key,
                 label: row.label,
                 value: row.amount,

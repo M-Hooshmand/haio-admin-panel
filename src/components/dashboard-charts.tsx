@@ -41,6 +41,16 @@ export function faDay(iso: string): string {
   }
 }
 
+export function faMonth(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "long" }).format(
+      new Date(`${iso}T12:00:00`)
+    )
+  } catch {
+    return iso
+  }
+}
+
 function niceMax(value: number): number {
   if (value <= 0) return 1
   const exponent = Math.floor(Math.log10(value))
@@ -387,6 +397,7 @@ export function DailyBarChart({
   bands = [],
   height = 220,
   formatValue = faNum,
+  labelFormat = faDay,
   extra,
 }: {
   labels: string[]
@@ -395,6 +406,7 @@ export function DailyBarChart({
   bands?: ChartBand[]
   height?: number
   formatValue?: (value: number) => string
+  labelFormat?: (label: string) => string
   extra?: (index: number) => { label: string; value: string }[]
 }) {
   const width = 860
@@ -460,7 +472,7 @@ export function DailyBarChart({
         ))}
         {xLabelIndices.map((i) => (
           <text key={`x-${i}`} x={x(i)} y={height - 8} textAnchor="middle" className="fill-slate-400" fontSize={10}>
-            {faDay(labels[i])}
+            {labelFormat(labels[i])}
           </text>
         ))}
       </svg>
@@ -469,7 +481,7 @@ export function DailyBarChart({
           className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[11px] shadow-lg"
           style={{ left: `${(x(index) / width) * 100}%` }}
         >
-          <p className="mb-1 font-bold text-slate-700">{faDay(labels[index])}</p>
+          <p className="mb-1 font-bold text-slate-700">{labelFormat(labels[index])}</p>
           <p className="whitespace-nowrap text-slate-700">{formatValue(values[index] ?? 0)}</p>
           {extra?.(index).map((row) => (
             <p key={row.label} className="whitespace-nowrap text-slate-500">
