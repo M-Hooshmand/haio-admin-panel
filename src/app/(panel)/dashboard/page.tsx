@@ -721,7 +721,7 @@ export default function DashboardPage() {
           {/* Campaign comparison */}
           <ChartCard
             title="کمپین‌ها و اثرشان"
-            subtitle="هر کمپین با ثبت‌نام، خرید و درآمد روزهایی که پیام ارسال شده مقایسه می‌شود."
+            subtitle="درآمد هر کمپین = پرداخت‌های خودِ دریافت‌کنندگانِ همان کمپین بعد از ارسال پیام (نه درآمد کل پلتفرم)."
             icon={Megaphone}
           >
             {activeCampaigns.length ? (
