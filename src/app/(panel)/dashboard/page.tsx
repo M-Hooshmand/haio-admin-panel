@@ -92,6 +92,7 @@ interface ServiceRow {
   available: boolean
   total: number | null
   active: number | null
+  deleted: number
 }
 
 interface AdminServiceUser {
@@ -566,18 +567,23 @@ export default function DashboardPage() {
             {/* Products */}
             <ChartCard
               title="محصولات ساخته‌شده"
-              subtitle={`تعداد محصول جدید هر خط در ${faNum(days)} روز گذشته.`}
+              subtitle={`تعداد محصول جدید هر خط در ${faNum(days)} روز گذشته (شامل مواردی که بعداً حذف شده‌اند).`}
               icon={CircleDashed}
             >
               <HBarList
-                items={data.products.map((product) => ({
-                  key: product.key,
-                  label: product.label,
-                  value: product.total,
-                  hint: product.available
-                    ? `${faNum(product.daily.reduce((sum, row) => sum + row.count, 0))} مورد در بازه`
-                    : "این محصول در دیتابیس پنل منبع داده ندارد",
-                }))}
+                items={data.products.map((product) => {
+                  const live = data.services.find((service) => service.key === product.key)
+                  return {
+                    key: product.key,
+                    label: product.label,
+                    value: product.total,
+                    hint: product.available
+                      ? `${faNum(product.daily.reduce((sum, row) => sum + row.count, 0))} مورد در بازه · موجود: ${faNum(
+                          live?.total ?? 0
+                        )} · فعال: ${faNum(live?.active ?? 0)}`
+                      : "این محصول در دیتابیس پنل منبع داده ندارد",
+                  }
+                })}
               />
             </ChartCard>
 
@@ -624,7 +630,9 @@ export default function DashboardPage() {
                   label: service.label,
                   value: service.active,
                   hint: service.available
-                    ? `از ${faNum(service.total)} سرویس ساخته‌شده`
+                    ? `از ${faNum(service.total)} سرویس موجود${
+                        service.deleted ? ` · ${faNum(service.deleted)} حذف‌شده` : ""
+                      }`
                     : "این محصول در دیتابیس پنل منبع داده ندارد",
                 }))}
               />
@@ -633,7 +641,7 @@ export default function DashboardPage() {
             {/* Admin-created services */}
             <ChartCard
               title="سرویس‌های ساخته‌شده توسط ادمین‌ها"
-              subtitle="حجم سرویس‌هایی که حساب‌های ادمین/پشتیبانی ساخته‌اند؛ برای جدا نگه‌داشتن آن‌ها از آمار واقعی مشتریان."
+              subtitle="تعداد سرویس‌های موجود که حساب‌های ادمین/پشتیبانی ساخته‌اند؛ برای جدا نگه‌داشتن آن‌ها از آمار واقعی مشتریان."
               icon={ShieldCheck}
             >
               <HBarList
@@ -642,7 +650,9 @@ export default function DashboardPage() {
                   label: service.label,
                   value: service.total,
                   hint: service.available
-                    ? `فعال: ${faNum(service.active)}`
+                    ? `فعال: ${faNum(service.active)}${
+                        service.deleted ? ` · ${faNum(service.deleted)} حذف‌شده` : ""
+                      }`
                     : "منبع داده ثبت نشده",
                 }))}
               />
