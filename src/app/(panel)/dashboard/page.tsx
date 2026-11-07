@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils"
 import {
   DailyBarChart,
   Funnel,
+  GroupedBarChart,
   HBarList,
-  TimeSeriesChart,
   faCompact,
   faDay,
   faNum,
@@ -337,7 +337,7 @@ export default function DashboardPage() {
             subtitle="ثبت‌نام‌های جدید و تعداد نفراتی از همان ثبت‌نام‌ها که احراز هویت (شاهکار) کرده‌اند — نوارهای بنفش، روزهای کمپین هستند."
             icon={Users}
           >
-            <TimeSeriesChart
+            <GroupedBarChart
               labels={labels}
               bands={bands}
               series={[
@@ -345,7 +345,6 @@ export default function DashboardPage() {
                   key: "signups",
                   label: "ثبت‌نام",
                   color: "#4f46e5",
-                  type: "area",
                   values: data.signups_daily.map((row) => row.signups),
                 },
                 {
@@ -495,7 +494,7 @@ export default function DashboardPage() {
             subtitle="تعداد ورود موفق و کاربران یکتا در هر روز. داده‌های پیش از فعال‌سازی ثبت رویداد، از آخرین ورود کاربران بازسازی شده است."
             icon={Activity}
           >
-            <TimeSeriesChart
+            <GroupedBarChart
               labels={labels}
               bands={bands}
               series={[
@@ -503,7 +502,6 @@ export default function DashboardPage() {
                   key: "logins",
                   label: "ورود",
                   color: "#0ea5e9",
-                  type: "area",
                   values: data.logins_daily.map((row) => row.logins),
                 },
                 {

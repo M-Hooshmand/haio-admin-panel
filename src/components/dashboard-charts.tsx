@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -240,6 +240,146 @@ export function TimeSeriesChart({
   )
 }
 
+export function GroupedBarChart({
+  labels,
+  series,
+  bands = [],
+  height = 280,
+  formatValue = faNum,
+}: {
+  labels: string[]
+  series: Series[]
+  bands?: ChartBand[]
+  height?: number
+  formatValue?: (value: number) => string
+}) {
+  const width = 1100
+  const pad = { left: 54, right: 14, top: 14, bottom: 28 }
+  const { index, setIndex } = useHoverIndex(labels.length)
+  const max = useMemo(
+    () => niceMax(Math.max(1, ...series.flatMap((s) => s.values))),
+    [series]
+  )
+  const plotW = width - pad.left - pad.right
+  const plotH = height - pad.top - pad.bottom
+  const step = plotW / Math.max(1, labels.length)
+  const barW = Math.max(2, Math.min(13, (step * 0.74) / Math.max(1, series.length)))
+  const groupW = barW * series.length
+  const x = (i: number, si: number) =>
+    pad.left + i * step + (step - groupW) / 2 + si * barW + barW / 2
+  const y = (v: number) => pad.top + (1 - v / max) * plotH
+
+  const onMove = (event: React.MouseEvent<SVGSVGElement>) => {
+    if (labels.length <= 1) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const px = ((event.clientX - rect.left) / rect.width) * width
+    const raw = Math.floor((px - pad.left) / step)
+    setIndex(Math.max(0, Math.min(labels.length - 1, raw)))
+  }
+
+  const xLabelIndices = useMemo(() => {
+    const stepN = Math.max(1, Math.ceil(labels.length / 7))
+    const out: number[] = []
+    for (let i = 0; i < labels.length; i += stepN) out.push(i)
+    if (out[out.length - 1] !== labels.length - 1) out.push(labels.length - 1)
+    return out
+  }, [labels.length])
+
+  return (
+    <div className="relative" dir="ltr">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-auto w-full"
+        onMouseMove={onMove}
+        onMouseLeave={() => setIndex(null)}
+        role="img"
+      >
+        {bands.map((band, i) => (
+          <rect
+            key={`band-${i}`}
+            x={pad.left + Math.max(0, band.start) * step}
+            y={pad.top}
+            width={Math.max(2, (Math.min(labels.length - 1, band.end) - Math.max(0, band.start) + 1) * step)}
+            height={plotH}
+            fill="#6366f1"
+            opacity={0.06}
+          >
+            <title>{band.label}</title>
+          </rect>
+        ))}
+        {yTicks(max).map((tick) => (
+          <g key={`t-${tick}`}>
+            <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} stroke="#e2e8f0" />
+            <text x={pad.left - 8} y={y(tick) + 4} textAnchor="end" className="fill-slate-400" fontSize={10}>
+              {faCompact(tick)}
+            </text>
+          </g>
+        ))}
+        {series.map((s, si) =>
+          s.values.map((v, i) => (
+            <rect
+              key={`b-${s.key}-${i}`}
+              x={x(i, si) - barW / 2}
+              y={y(v)}
+              width={Math.max(1.5, barW - 0.8)}
+              height={Math.max(0, pad.top + plotH - y(v))}
+              rx={Math.min(2, barW / 3)}
+              fill={s.color}
+              opacity={index === null || index === i ? 0.92 : 0.35}
+            />
+          ))
+        )}
+        {index !== null ? (
+          <rect
+            x={pad.left + index * step}
+            y={pad.top}
+            width={step}
+            height={plotH}
+            fill="#94a3b8"
+            opacity={0.08}
+          />
+        ) : null}
+        {xLabelIndices.map((i) => (
+          <text
+            key={`x-${i}`}
+            x={pad.left + i * step + step / 2}
+            y={height - 8}
+            textAnchor="middle"
+            className="fill-slate-400"
+            fontSize={10}
+          >
+            {faDay(labels[i])}
+          </text>
+        ))}
+      </svg>
+
+      {index !== null ? (
+        <div
+          className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[11px] shadow-lg"
+          style={{ left: `${((pad.left + index * step + step / 2) / width) * 100}%` }}
+        >
+          <p className="mb-1 font-bold text-slate-700">{faDay(labels[index])}</p>
+          {series.map((s) => (
+            <p key={s.key} className="flex items-center gap-1.5 whitespace-nowrap text-slate-600">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: s.color }} />
+              {s.label}: <span className="font-bold text-slate-800">{formatValue(s.values[index] ?? 0)}</span>
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-4" dir="rtl">
+        {series.map((s) => (
+          <span key={s.key} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function DailyBarChart({
   labels,
   values,
@@ -405,35 +545,88 @@ export function Funnel({
 }: {
   stages: { label: string; value: number; hint?: string; color: string }[]
 }) {
+  const uid = useId().replace(/[:]/g, "")
   const first = Math.max(1, stages[0]?.value ?? 1)
+  const width = 680
+  const height = 310
+  const topPad = 10
+  const gap = 6
+  const cx = width / 2
+  const maxW = 520
+  const blockH = (height - topPad * 2 - gap * Math.max(0, stages.length - 1)) / Math.max(1, stages.length)
+  const widths = stages.map((stage) => Math.max(64, (stage.value / first) * maxW))
+
   return (
-    <div className="space-y-3">
-      {stages.map((stage, i) => {
-        const pct = Math.round((stage.value / first) * 100)
-        return (
-          <div key={stage.label}>
-            <div className="mb-1 flex items-baseline justify-between text-xs">
-              <span className="font-medium text-slate-700">{stage.label}</span>
-              <span className="text-slate-500">
-                <span className="font-bold text-slate-800">{faNum(stage.value)}</span>
-                <span className="mr-1 text-[10px] text-slate-400">({faNum(pct)}٪)</span>
-              </span>
-            </div>
-            <div className="h-7 w-full overflow-hidden rounded-lg bg-slate-100">
-              <div
-                className="flex h-full items-center justify-end rounded-lg px-2 text-[10px] font-bold text-white transition-all"
-                style={{ width: `${Math.max(4, pct)}%`, background: stage.color }}
+    <div dir="rtl">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img">
+        <defs>
+          {stages.map((stage, i) => (
+            <linearGradient key={`g-${i}`} id={`funnel-${uid}-${i}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={stage.color} stopOpacity={0.95} />
+              <stop offset="100%" stopColor={stage.color} stopOpacity={0.72} />
+            </linearGradient>
+          ))}
+        </defs>
+        {stages.map((stage, i) => {
+          const y = topPad + i * (blockH + gap)
+          const wTop = widths[i]
+          const wBottom = i < stages.length - 1 ? widths[i + 1] : Math.max(56, widths[i] * 0.78)
+          const points = [
+            `${cx - wTop / 2},${y}`,
+            `${cx + wTop / 2},${y}`,
+            `${cx + wBottom / 2},${y + blockH}`,
+            `${cx - wBottom / 2},${y + blockH}`,
+          ].join(" ")
+          const pct = Math.round((stage.value / first) * 100)
+          return (
+            <g key={stage.label}>
+              <polygon points={points} fill={`url(#funnel-${uid}-${i})`} />
+              <text
+                x={cx}
+                y={y + blockH * 0.32}
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize={13}
+                fontWeight={600}
               >
-                {pct >= 18 ? faNum(stage.value) : ""}
-              </div>
-            </div>
-            {stage.hint ? <p className="mt-1 text-[10px] text-slate-400">{stage.hint}</p> : null}
-            {i < stages.length - 1 ? (
-              <div className="mx-auto my-1 h-2 w-px bg-slate-200" />
-            ) : null}
-          </div>
-        )
-      })}
+                {stage.label}
+              </text>
+              <text
+                x={cx}
+                y={y + blockH * 0.62}
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize={22}
+                fontWeight={700}
+              >
+                {faNum(stage.value)}
+              </text>
+              <text
+                x={cx}
+                y={y + blockH * 0.82}
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize={10}
+                opacity={0.85}
+              >
+                {faNum(pct)}٪ از ابتدای قیف
+              </text>
+              {stage.hint && wBottom > 210 ? (
+                <text
+                  x={cx}
+                  y={y + blockH * 0.94}
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize={9}
+                  opacity={0.8}
+                >
+                  {stage.hint}
+                </text>
+              ) : null}
+            </g>
+          )
+        })}
+      </svg>
     </div>
   )
 }
