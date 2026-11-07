@@ -566,8 +566,8 @@ export default function DashboardPage() {
           <div className="grid gap-4 xl:grid-cols-2">
             {/* Products */}
             <ChartCard
-              title="محصولات ساخته‌شده"
-              subtitle={`تعداد محصول جدید هر خط در ${faNum(days)} روز گذشته (شامل مواردی که بعداً حذف شده‌اند).`}
+              title="محصولات ساخته‌شده توسط مشتریان"
+              subtitle={`تعداد محصول جدید مشتریان در ${faNum(days)} روز گذشته، بدون داده‌های مهاجرت و بدون سرویس‌های ادمین (آن‌ها در کارت پایین هستند). تاریخچه واقعی محصولات از نیمه مهر ۱۴۰۵ شروع شده است.`}
               icon={CircleDashed}
             >
               <HBarList
@@ -641,7 +641,7 @@ export default function DashboardPage() {
             {/* Admin-created services */}
             <ChartCard
               title="سرویس‌های ساخته‌شده توسط ادمین‌ها"
-              subtitle="تعداد سرویس‌های موجود که حساب‌های ادمین/پشتیبانی ساخته‌اند؛ برای جدا نگه‌داشتن آن‌ها از آمار واقعی مشتریان."
+              subtitle="تعداد سرویس‌های موجود که حساب‌های ادمین/پشتیبانی ساخته‌اند — از جمله دسکتاپ مجازی. این سرویس‌ها در آمار مشتریان شمرده نمی‌شوند."
               icon={ShieldCheck}
             >
               <HBarList
