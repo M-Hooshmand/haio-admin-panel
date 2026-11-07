@@ -134,26 +134,36 @@ interface FlashIpVm {
   status: string
   status_display: string
   short_id: string
-  ip_matches: boolean
   owner: FlashOwner
   organization: FlashOrg
   machine_no: number | null
 }
 
-interface FlashIp {
+interface FlashDedicated {
   id: string
-  address: string
-  gateway: string | null
-  subnet_mask: string | null
-  is_ipv6: boolean
+  server_name: string
+  note: string
   is_active: boolean
-  geo: "iran" | "foreign"
-  mac: string
-  state: "assigned" | "free" | "inactive" | "stale"
+}
+
+interface FlashIp {
+  address: string
+  state: "assigned" | "free" | "reserved" | "stale" | "dedicated" | "unregistered"
+  state_display: string
+  is_active: boolean | null
+  mac: string | null
+  gateway: string | null
   region: string | null
   node: string | null
   vm: FlashIpVm | null
-  created_at: string
+  extra_claims: Array<{
+    id: string
+    name: string
+    status: string
+    status_display: string
+    owner: FlashOwner
+  }>
+  dedicated: FlashDedicated | null
 }
 
 interface IpRange {
@@ -162,32 +172,28 @@ interface IpRange {
   count: number
   assigned: number
   free: number
-  inactive: number
+  reserved: number
+  stale: number
+  dedicated: number
+  unregistered: number
 }
 
 interface IpSummary {
   total: number
   assigned: number
   free: number
-  inactive: number
+  reserved: number
   stale: number
-  ipv6: number
-  // Iran — the Shatel Tehran blocks routed to the microVM nodes.
-  iran_total: number
-  iran_assigned: number
-  iran_free: number
-  iran_inactive: number
-  iran_stale: number
-  iran_ranges: IpRange[]
-  iran_range_count: number
-  // Foreign/retired rows — no server behind them any more.
-  foreign_total: number
-  foreign_assigned: number
-  foreign_free: number
-  foreign_inactive: number
-  foreign_stale: number
-  foreign_ranges: IpRange[]
-  foreign_range_count: number
+  dedicated: number
+  unregistered: number
+  usable: number
+  running: number
+  stopped: number
+  suspended: number
+  vm_claim_count: number
+  duplicate_addresses: null | Array<{ address: string; names: string[] }>
+  ranges: IpRange[]
+  range_count: number
 }
 
 interface IpPage {
@@ -198,6 +204,15 @@ interface IpPage {
   generated_at: string
   summary: IpSummary
   results: FlashIp[]
+}
+
+interface DedicatedRow {
+  id: string
+  address: string
+  server_name: string
+  note: string
+  is_active: boolean
+  created_at: string
 }
 
 interface HistClaim {
@@ -273,17 +288,21 @@ const VM_STATUS: Record<string, { label: string; chip: string; dot: string }> = 
 }
 
 const IP_STATES = [
-  { value: "assigned", label: "اختصاص‌یافته به مشتری" },
-  { value: "free", label: "آزاد (در استخر)" },
-  { value: "inactive", label: "غیرفعال / قرنطینه" },
-  { value: "stale", label: "متصل به سرور حذف‌شده" },
+  { value: "assigned", label: "دست مشتری" },
+  { value: "free", label: "آزاد (استخر)" },
+  { value: "reserved", label: "رزروی (بلاک / فیلتر / ایران‌اکسس)" },
+  { value: "stale", label: "نیازمند بازپس‌گیری" },
+  { value: "dedicated", label: "سرور اختصاصی" },
+  { value: "unregistered", label: "خارج از استخر" },
 ]
 
 const IP_STATE_STYLE: Record<string, { label: string; chip: string }> = {
-  assigned: { label: "اختصاص‌یافته", chip: "bg-emerald-50 text-emerald-700" },
-  free: { label: "آزاد", chip: "bg-sky-50 text-sky-700" },
-  inactive: { label: "غیرفعال / قرنطینه", chip: "bg-rose-50 text-rose-700" },
-  stale: { label: "میان‌حالت", chip: "bg-amber-50 text-amber-700" },
+  assigned: { label: "دست مشتری", chip: "bg-emerald-50 text-emerald-700" },
+  free: { label: "آزاد (استخر)", chip: "bg-sky-50 text-sky-700" },
+  reserved: { label: "رزروی (بلاک / فیلتر)", chip: "bg-rose-50 text-rose-700" },
+  stale: { label: "نیازمند بازپس‌گیری", chip: "bg-amber-50 text-amber-700" },
+  dedicated: { label: "سرور اختصاصی", chip: "bg-indigo-50 text-indigo-700" },
+  unregistered: { label: "خارج از استخر", chip: "bg-slate-100 text-slate-500" },
 }
 
 const faNumber = new Intl.NumberFormat("fa-IR")
@@ -524,10 +543,11 @@ export default function HaioflashPage() {
     [user],
   )
 
-  const [tab, setTab] = useState<"vms" | "ips" | "history">("vms")
+  const [tab, setTab] = useState<"vms" | "ips" | "dedicated" | "history">("vms")
   const fetchVmsRef = useRef(0)
   const fetchIpsRef = useRef(0)
   const fetchHistRef = useRef(0)
+  const fetchDedRef = useRef(0)
 
   // --- machines -----------------------------------------------------------
   const [searchInput, setSearchInput] = useState("")
@@ -543,12 +563,19 @@ export default function HaioflashPage() {
   const [ipSearchInput, setIpSearchInput] = useState("")
   const [ipSearch, setIpSearch] = useState("")
   const [ipState, setIpState] = useState("")
-  const [ipGeo, setIpGeo] = useState("iran")
-  const [showForeignRanges, setShowForeignRanges] = useState(false)
-  const [ipPage, setIpPage] = useState(1)
   const [ipData, setIpData] = useState<IpPage | null>(null)
   const [ipLoading, setIpLoading] = useState(false)
   const [ipError, setIpError] = useState("")
+
+  // --- dedicated servers --------------------------------------------------
+  const [dedData, setDedData] = useState<DedicatedRow[] | null>(null)
+  const [dedLoading, setDedLoading] = useState(false)
+  const [dedError, setDedError] = useState("")
+  const [dedAddress, setDedAddress] = useState("")
+  const [dedServerName, setDedServerName] = useState("")
+  const [dedNote, setDedNote] = useState("")
+  const [dedSaving, setDedSaving] = useState(false)
+  const [dedRowEditing, setDedRowEditing] = useState<DedicatedRow | null>(null)
 
   // --- IP history ---------------------------------------------------------
   const [histInput, setHistInput] = useState("")
@@ -570,7 +597,6 @@ export default function HaioflashPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setIpSearch((current) => (ipSearchInput === current ? current : ipSearchInput))
-      setIpPage(1)
     }, 400)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -606,12 +632,10 @@ export default function HaioflashPage() {
     setIpError("")
     try {
       const params: Record<string, string | number> = {
-        page: ipPage,
-        page_size: PAGE_SIZE,
+        page_size: 200,
       }
       if (ipSearch) params.search = ipSearch
       if (ipState) params.state = ipState
-      if (ipGeo) params.geo = ipGeo
       const resp = await api.get<IpPage>("/panel/haioflash/ips/", { params })
       if (fetchIpsRef.current !== requestId) return
       setIpData(resp.data)
@@ -620,7 +644,70 @@ export default function HaioflashPage() {
     } finally {
       if (fetchIpsRef.current === requestId) setIpLoading(false)
     }
-  }, [allowed, ipPage, ipSearch, ipState, ipGeo])
+  }, [allowed, ipSearch, ipState])
+
+  const fetchDedicated = useCallback(async () => {
+    if (!allowed) return
+    const requestId = ++fetchDedRef.current
+    setDedLoading(true)
+    setDedError("")
+    try {
+      const resp = await api.get<DedicatedRow[]>("/panel/haioflash/dedicated/", {
+        params: { page_size: 50 },
+      })
+      if (fetchDedRef.current !== requestId) return
+      setDedData(Array.isArray(resp.data) ? resp.data : (resp.data as unknown as { results?: DedicatedRow[] } & DedicatedRow[]).results ?? [])
+    } catch (error) {
+      if (fetchDedRef.current === requestId) setDedError(extractError(error))
+    } finally {
+      if (fetchDedRef.current === requestId) setDedLoading(false)
+    }
+  }, [allowed])
+
+  const saveDedicated = useCallback(async () => {
+    const address = dedAddress.trim()
+    if (!address) return
+    const requestId = ++fetchDedRef.current
+    setDedSaving(true)
+    setDedError("")
+    try {
+      await api.post("/panel/haioflash/dedicated/", {
+        address,
+        server_name: dedServerName.trim(),
+        note: dedNote.trim(),
+      })
+      setDedAddress("")
+      setDedServerName("")
+      setDedNote("")
+      await fetchDedicated()
+    } catch (error) {
+      setDedError(extractError(error))
+    } finally {
+      void requestId
+      setDedSaving(false)
+    }
+  }, [allowed, dedAddress, dedServerName, dedNote, fetchDedicated])
+
+  const updateDedicated = useCallback(async (row: DedicatedRow, patch: Record<string, unknown>) => {
+    setDedError("")
+    try {
+      await api.patch(`/panel/haioflash/dedicated/${row.id}/`, patch)
+      await fetchDedicated()
+    } catch (error) {
+      setDedError(extractError(error))
+    }
+  }, [fetchDedicated])
+
+  const deleteDedicated = useCallback(async (row: DedicatedRow) => {
+    if (!window.confirm(`آی‌پی ${row.address} از سرورهای اختصاصی حذف شود؟`)) return
+    setDedError("")
+    try {
+      await api.delete(`/panel/haioflash/dedicated/${row.id}/`)
+      await fetchDedicated()
+    } catch (error) {
+      setDedError(extractError(error))
+    }
+  }, [fetchDedicated])
 
   const fetchHistory = useCallback(async () => {
     if (!allowed || !histAddress) return
@@ -654,6 +741,11 @@ export default function HaioflashPage() {
     void fetchIps()
   }, [tab, fetchIps])
 
+  useEffect(() => {
+    if (tab !== "dedicated") return
+    void fetchDedicated()
+  }, [tab, fetchDedicated])
+
   if (authLoading) {
     return (
       <div className="flex h-64 items-center justify-center text-slate-400">
@@ -681,7 +773,7 @@ export default function HaioflashPage() {
           <h1 className="text-xl font-semibold text-slate-800">هایوفلش</h1>
           <p className="mt-1 text-sm text-slate-500">
             کل سرورهای ابری کاربران — شماره ماشین، مالک، آی‌پی، اطلاعات ورود، تاریخ ساخت و انقضا، مصرف ترافیک و پلن.
-            زیرتب «موجودی آی‌پی» وضعیت کامل استخر آی‌پی و رنج‌ها را نشان می‌دهد و زیرتب «سوابق آی‌پی» تاریخچهٔ مالکیت هر آی‌پی.
+            زیرتب «موجودی آی‌پی» کل ۱۲۸ آی‌پی شاتل تهران را وضعیت‌به‌وضعیت نشان می‌دهد، زیرتب «سوابق آی‌پی» تاریخچهٔ مالکیت هر آی‌پی و زیرتب «سرور اختصاصی» آی‌پی‌های رزروشدهٔ سرورهای اختصاصی.
           </p>
           {vmData ? (
             <p className="mt-1 text-xs text-slate-400">آخرین بروزرسانی: {formatDateTime(vmData.generated_at)}</p>
@@ -689,10 +781,24 @@ export default function HaioflashPage() {
         </div>
         <Button
           variant="outline"
-          onClick={() => (tab === "vms" ? fetchVms() : tab === "ips" ? fetchIps() : fetchHistory())}
-          disabled={vmLoading || ipLoading || histLoading}
+          onClick={() =>
+            tab === "vms"
+              ? fetchVms()
+              : tab === "ips"
+                ? fetchIps()
+                : tab === "dedicated"
+                  ? fetchDedicated()
+                  : fetchHistory()
+          }
+          disabled={vmLoading || ipLoading || dedLoading || histLoading}
         >
-          <RefreshCw className={cn("size-4", (tab === "vms" ? vmLoading : tab === "ips" ? ipLoading : histLoading) && "animate-spin")} />
+          <RefreshCw
+            className={cn(
+              "size-4",
+              (tab === "vms" ? vmLoading : tab === "ips" ? ipLoading : tab === "dedicated" ? dedLoading : histLoading) &&
+                "animate-spin",
+            )}
+          />
           بروزرسانی
         </Button>
       </div>
@@ -718,6 +824,16 @@ export default function HaioflashPage() {
           )}
         >
           موجودی آی‌پی
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("dedicated")}
+          className={cn(
+            "rounded-lg px-4 py-1.5 text-sm font-medium transition",
+            tab === "dedicated" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50",
+          )}
+        >
+          سرور اختصاصی
         </button>
         <button
           type="button"
@@ -894,79 +1010,54 @@ export default function HaioflashPage() {
         </section>
       ) : tab === "ips" ? (
         <section className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <MetaCard title="کل آی‌پی ایران" value={formatNumber(ipSummary?.iran_total)} note="شاتل تهران — ۹۴٫۱۸۲" highlight />
-            <MetaCard title="اختصاص‌یافته" value={formatNumber(ipSummary?.iran_assigned)} note="به سرور کاربر فعال" />
-            <MetaCard title="آزاد (استخر ایران)" value={formatNumber(ipSummary?.iran_free)} note="قابل اختصاص" />
-            <MetaCard title="غیرفعال / قرنطینه ایران" value={formatNumber(ipSummary?.iran_inactive)} note="فیلترشده · خارج از استخر" />
-            <MetaCard title="متصل به سرور حذف‌شده" value={formatNumber(ipSummary?.iran_stale)} note="نیازمند بازپس‌گیری" />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <MetaCard title="کل آی‌پی‌ها" value={formatNumber(ipSummary?.total)} note={`${formatNumber(ipSummary?.range_count)} رنج ۶۴تایی شاتل`} highlight />
             <MetaCard
-              title="خارج از ایران (بدون سرویس)"
-              value={formatNumber(ipSummary?.foreign_total)}
-              note={ipSummary?.foreign_free ? `${formatNumber(ipSummary.foreign_free)} ردیف آزاد بی‌فایده` : "هلند · فرانسه · آلمان"}
+              title="دست مشتری"
+              value={formatNumber(ipSummary?.assigned)}
+              note={`در حال اجرا ${formatNumber(ipSummary?.running)} · متوقف ${formatNumber(ipSummary?.stopped)} · ساسپند ${formatNumber(ipSummary?.suspended)}`}
             />
+            <MetaCard title="آزاد (استخر)" value={formatNumber(ipSummary?.free)} note="قابل اختصاص" />
+            <MetaCard title="رزروی (بلاک/فیلتر/ایران‌اکسس)" value={formatNumber(ipSummary?.reserved)} note="قابل استفاده نیست" />
+            <MetaCard title="سرور اختصاصی" value={formatNumber(ipSummary?.dedicated)} note="رزرو دست خودمان" />
+            <MetaCard title="نیازمند بازپس‌گیری" value={formatNumber(ipSummary?.stale)} note="فقط ردیف حذف‌شده مانده" />
+            <MetaCard title="خارج از استخر" value={formatNumber(ipSummary?.unregistered)} note={`قابل استفاده در مجموع: ${formatNumber(ipSummary?.usable)}`} />
           </div>
 
           <p className="text-xs text-slate-400">
-            فقط {formatNumber(ipSummary?.iran_total)} آی‌پی {formatNumber(ipSummary?.iran_range_count)} رنج شاتل تهران (۹۴٫۱۸۲٫۹۴٫۰–۶۳ و ۹۴٫۱۸۲٫۱۷۲٫۶۴–۱۲۷) قابل اختصاص است؛
-            {" "}{formatNumber(ipSummary?.foreign_total)} آی‌پی دیگر (هلند، فرانسه، آلمان و رنج‌های بازنشستهٔ ۹۴٫۱۸۲) سرویس فعال ندارند و فقط برای سابقه نگه‌داری می‌شوند.
+            کل فضای شاتل تهران {formatNumber(ipSummary?.total)} آی‌پی در {formatNumber(ipSummary?.range_count)} رنج ۶۴تایی (۹۴٫۱۸۲٫۹۴٫۰–۶۳ و ۹۴٫۱۸۲٫۱۷۲٫۶۴–۱۲۷) است؛
+            {" "}{formatNumber(ipSummary?.vm_claim_count)} سرور روی این فضا ثبت‌شده و رنج‌های خارج از ایران نمایش داده نمی‌شوند.
           </p>
 
-          {ipSummary?.iran_ranges.length ? (
+          {ipSummary?.ranges.length ? (
             <div>
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium text-slate-600">
-                  رنج‌های آی‌پی ایران — از چه آی‌پی تا چه آی‌پی ({formatNumber(ipSummary.iran_ranges.length)} رنج):
-                </p>
-                {ipSummary.foreign_ranges.length ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowForeignRanges((value) => !value)}
-                    className="text-xs text-slate-500 underline decoration-dotted hover:text-slate-700"
-                  >
-                    {showForeignRanges
-                      ? "بستن رنج‌های خارجی"
-                      : `نمایش رنج‌های خارجی (${formatNumber(ipSummary.foreign_range_count)})`}
-                  </button>
-                ) : null}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {ipSummary.iran_ranges.map((range) => (
+              <p className="mb-2 text-sm font-medium text-slate-600">
+                رنج‌ها — از چه آی‌پی تا چه آی‌پی:
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {ipSummary.ranges.map((range) => (
                   <div key={`${range.from}-${range.to}`} className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3" dir="ltr">
                     <p className="font-mono text-sm font-medium text-slate-800">
                       {range.from} <span className="text-slate-400">→</span> {range.to}
                     </p>
                     <p className="mt-1 text-[11px] text-slate-400">{faNumber.format(range.count)} آی‌پی</p>
                     <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]" dir="rtl">
-                      <span className="text-emerald-600">اختصاصی {faNumber.format(range.assigned)}</span>
+                      <span className="text-emerald-600">دست مشتری {faNumber.format(range.assigned)}</span>
                       <span className="text-sky-600">آزاد {faNumber.format(range.free)}</span>
-                      {range.inactive ? <span className="text-rose-600">قرنطینه {faNumber.format(range.inactive)}</span> : null}
+                      {range.reserved ? <span className="text-rose-600">رزروی {faNumber.format(range.reserved)}</span> : null}
+                      {range.stale ? <span className="text-amber-600">بازپس‌گیری {faNumber.format(range.stale)}</span> : null}
+                      {range.dedicated ? <span className="text-indigo-600">اختصاصی {faNumber.format(range.dedicated)}</span> : null}
+                      <span className="text-slate-500">خارج از استخر {faNumber.format(range.unregistered)}</span>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          ) : null}
-
-          {ipSummary?.foreign_ranges.length && showForeignRanges ? (
-            <div>
-              <p className="mb-2 text-sm font-medium text-slate-500">
-                رنج‌های خارجی (بدون سرویس — {formatNumber(ipSummary.foreign_range_count)} رنج):
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {ipSummary.foreign_ranges.map((range) => (
-                  <div key={`${range.from}-${range.to}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3" dir="ltr">
-                    <p className="font-mono text-sm text-slate-600">
-                      {range.from} <span className="text-slate-400">→</span> {range.to}
-                    </p>
-                    <p className="mt-1 text-[11px] text-slate-400">{faNumber.format(range.count)} آی‌پی</p>
-                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]" dir="rtl">
-                      <span className="text-sky-600">آزاد {faNumber.format(range.free)}</span>
-                      {range.inactive ? <span className="text-rose-600">قرنطینه {faNumber.format(range.inactive)}</span> : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {ipSummary.duplicate_addresses?.length ? (
+                <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                  هشدار: {formatNumber(ipSummary.duplicate_addresses.length)} آی‌پی بیش از یک ردیف زنده دارد —{" "}
+                  {ipSummary.duplicate_addresses.map((d) => `${d.address} (${d.names.join(" و ")})`).join("، ")}. ردیف‌های تکراری نیازمند پاکسازی‌اند.
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -981,23 +1072,8 @@ export default function HaioflashPage() {
               />
             </div>
             <select
-              value={ipGeo}
-              onChange={(event) => {
-                setIpGeo(event.target.value)
-                setIpPage(1)
-              }}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
-            >
-              <option value="iran">آی‌پی‌های ایران (شاتل)</option>
-              <option value="foreign">خارج از ایران (بدون سرویس)</option>
-              <option value="">همه آی‌پی‌ها</option>
-            </select>
-            <select
               value={ipState}
-              onChange={(event) => {
-                setIpState(event.target.value)
-                setIpPage(1)
-              }}
+              onChange={(event) => setIpState(event.target.value)}
               className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
             >
               <option value="">همه حالت‌ها</option>
@@ -1012,27 +1088,25 @@ export default function HaioflashPage() {
           ) : null}
 
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-            <table className="min-w-[1000px] w-full text-right text-sm">
+            <table className="min-w-[900px] w-full text-right text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
                   <th className="px-4 py-3 font-medium">آی‌پی</th>
                   <th className="px-4 py-3 font-medium">وضعیت</th>
-                  <th className="px-4 py-3 font-medium">سرور اختصاصی</th>
-                  <th className="px-4 py-3 font-medium">برای چه کسی</th>
+                  <th className="px-4 py-3 font-medium">سرور / سرور اختصاصی</th>
                   <th className="px-4 py-3 font-medium">نود / ناحیه</th>
-                  <th className="px-4 py-3 font-medium">تاریخ افزودن</th>
                 </tr>
               </thead>
               <tbody>
                 {ipLoading && !ipData ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-16 text-center text-slate-400">
+                    <td colSpan={4} className="px-4 py-16 text-center text-slate-400">
                       <Loader2 className="mx-auto size-6 animate-spin" />
                     </td>
                   </tr>
                 ) : (ipData?.results.length ?? 0) === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-16 text-center text-slate-400">
+                    <td colSpan={4} className="px-4 py-16 text-center text-slate-400">
                       آی‌پی‌ای با این فیلترها پیدا نشد.
                     </td>
                   </tr>
@@ -1040,47 +1114,36 @@ export default function HaioflashPage() {
                   ipData?.results.map((ip) => {
                     const meta = IP_STATE_STYLE[ip.state]
                     return (
-                      <tr key={ip.id} className="border-b border-slate-100 align-top last:border-0 hover:bg-slate-50/60">
+                      <tr key={ip.address} className="border-b border-slate-100 align-top last:border-0 hover:bg-slate-50/60">
                         <td className="px-4 py-3" dir="ltr">
                           <p className="font-mono text-sm font-medium text-slate-800">{ip.address}</p>
-                          <p className="font-mono text-[10px] text-slate-400">{ip.mac || "—"}</p>
+                          {ip.mac ? <p className="font-mono text-[10px] text-slate-400">{ip.mac}</p> : null}
                           {ip.gateway ? <p className="font-mono text-[10px] text-slate-400">GW {ip.gateway}</p> : null}
                         </td>
                         <td className="px-4 py-3">
                           <span className={cn("inline-block rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap", meta?.chip ?? "bg-slate-100 text-slate-600")}>
-                            {meta?.label ?? ip.state}
+                            {ip.state_display || meta?.label || ip.state}
                           </span>
-                          <span
-                            className={cn(
-                              "mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
-                              ip.geo === "iran" ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-700",
-                            )}
-                          >
-                            {ip.geo === "iran" ? "ایران (شاتل)" : "خارج — بدون سرویس"}
-                          </span>
-                          {ip.is_ipv6 ? <p className="mt-1 text-[10px] text-slate-400">IPv6</p> : null}
                         </td>
                         <td className="px-4 py-3">
-                          {ip.vm ? (
+                          {ip.dedicated ? (
+                            <div>
+                              <p className="font-medium text-indigo-700">{ip.dedicated.server_name || "سرور اختصاصی"}</p>
+                              {ip.dedicated.note ? <p className="text-[11px] text-slate-400">{ip.dedicated.note}</p> : null}
+                            </div>
+                          ) : ip.vm ? (
                             <div>
                               <p className="font-medium text-slate-700">{ip.vm.name}</p>
                               <p className="text-[11px] text-slate-400">
                                 {ip.vm.status_display} · {ip.vm.machine_no ? `ماشین ${formatNumber(ip.vm.machine_no)}` : ip.vm.short_id}
                               </p>
-                              {!ip.vm.ip_matches ? (
-                                <p className="text-[10px] text-amber-600">آی‌پی ثبت‌شده سرور با این ردیف یکسان نیست</p>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {ip.vm ? (
-                            <div>
-                              <p className="text-slate-700">{ip.vm.owner?.display_name || "—"}</p>
-                              <p className="text-[11px] text-slate-400">{ip.vm.organization.name}</p>
+                              <p className="text-[11px] text-slate-500">{ip.vm.owner?.display_name || "—"}</p>
                               {ip.vm.owner?.mobile ? <p className="text-[11px] text-slate-400" dir="ltr">{ip.vm.owner.mobile}</p> : null}
+                              {ip.extra_claims.length ? (
+                                <p className="mt-1 text-[10px] text-amber-600">
+                                  ردیف تکراری: {ip.extra_claims.map((c) => `${c.name} (${c.status_display})`).join("، ")} — سابقه را در «سوابق آی‌پی» ببینید
+                                </p>
+                              ) : null}
                             </div>
                           ) : (
                             <span className="text-slate-300">—</span>
@@ -1090,7 +1153,6 @@ export default function HaioflashPage() {
                           {ip.region ?? "—"}
                           {ip.node ? <p className="text-[11px] text-slate-400">{ip.node}</p> : null}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-500">{formatDate(ip.created_at)}</td>
                       </tr>
                     )
                   })
@@ -1099,17 +1161,127 @@ export default function HaioflashPage() {
             </table>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-            <p>{formatNumber(ipData?.count)} آی‌پی · صفحه {formatNumber(ipData?.page)} از {formatNumber(ipData?.pages)}</p>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled={(ipData?.page ?? 1) <= 1} onClick={() => setIpPage((value) => value - 1)}>
-                <ChevronRight className="size-4" /> قبلی
-              </Button>
-              <Button variant="outline" size="sm" disabled={(ipData?.page ?? 1) >= (ipData?.pages ?? 1)} onClick={() => setIpPage((value) => value + 1)}>
-                بعدی <ChevronLeft className="size-4" />
-              </Button>
+          <p className="text-xs text-slate-400">{formatNumber(ipData?.count)} آی‌پی · کل استخر به‌صورت یکجا (۱۲۸ آدرس) بدون صفحه‌بندی.</p>
+        </section>
+      ) : tab === "dedicated" ? (
+        <section className="space-y-4">
+          <p className="text-xs text-slate-500">
+            آی‌پی‌هایی که از فضای شاتل تهران رزرو کرده‌ایم و به سرورهای اختصاصی داده شده‌اند — این آی‌پی‌ها در «موجودی آی‌پی» مستقل از استخر مشتری‌ها شمرده می‌شوند.
+          </p>
+
+          {dedError ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{dedError}</div>
+          ) : null}
+
+          <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
+            <div className="min-w-[180px] flex-1">
+              <label className="mb-1 block text-xs text-slate-500">آدرس آی‌پی</label>
+              <Input
+                value={dedAddress}
+                onChange={(event) => setDedAddress(event.target.value)}
+                placeholder="94.182.94.57"
+                dir="ltr"
+                className="font-mono text-left"
+              />
             </div>
+            <div className="min-w-[160px] flex-1">
+              <label className="mb-1 block text-xs text-slate-500">نام سرور اختصاصی</label>
+              <Input
+                value={dedServerName}
+                onChange={(event) => setDedServerName(event.target.value)}
+                placeholder="مثلاً ts1-core"
+              />
+            </div>
+            <div className="min-w-[200px] flex-[2]">
+              <label className="mb-1 block text-xs text-slate-500">توضیح</label>
+              <Input
+                value={dedNote}
+                onChange={(event) => setDedNote(event.target.value)}
+                placeholder="اختیاری"
+              />
+            </div>
+            <Button onClick={() => void saveDedicated()} disabled={dedSaving || !dedAddress.trim()}>
+              {dedSaving ? <Loader2 className="size-4 animate-spin" /> : null}
+              ثبت
+            </Button>
           </div>
+
+          {dedLoading && !dedData ? (
+            <div className="flex h-40 items-center justify-center text-slate-400">
+              <Loader2 className="size-6 animate-spin" />
+            </div>
+          ) : (dedData?.length ?? 0) === 0 ? (
+            <p className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-400">
+              هنوز آی‌پی‌ای برای سرور اختصاصی ثبت نشده است.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {dedData?.map((row) => (
+                <div key={row.id} className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-sm font-medium text-slate-800" dir="ltr">{row.address}</p>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        row.is_active ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500",
+                      )}
+                    >
+                      {row.is_active ? "فعال" : "غیرفعال"}
+                    </span>
+                  </div>
+                  {dedRowEditing?.id === row.id ? (
+                    <div className="mt-2 space-y-2">
+                      <Input
+                        value={dedRowEditing.server_name}
+                        onChange={(event) =>
+                          setDedRowEditing({ ...dedRowEditing, server_name: event.target.value })
+                        }
+                        placeholder="نام سرور"
+                      />
+                      <Input
+                        value={dedRowEditing.note}
+                        onChange={(event) => setDedRowEditing({ ...dedRowEditing, note: event.target.value })}
+                        placeholder="توضیح"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            void updateDedicated(row, {
+                              server_name: dedRowEditing.server_name,
+                              note: dedRowEditing.note,
+                            })
+                            setDedRowEditing(null)
+                          }}
+                        >
+                          ذخیره
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setDedRowEditing(null)}>
+                          انصراف
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-2 font-semibold text-indigo-700">
+                        {row.server_name || "بدون نام"}
+                      </p>
+                      {row.note ? <p className="mt-0.5 text-[11px] text-slate-500">{row.note}</p> : null}
+                      <p className="mt-1 text-[10px] text-slate-400">ثبت: {formatDate(row.created_at)}</p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setDedRowEditing(row)}>
+                          ویرایش
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => void deleteDedicated(row)}>
+                          حذف
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       ) : (
         <section className="space-y-4">
