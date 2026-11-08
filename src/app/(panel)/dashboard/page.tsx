@@ -44,6 +44,7 @@ interface Kpis {
   inflow_amount: number
   gateway_inflow_amount: number
   wallet_inflow_amount: number
+  manual_inflow_amount?: number
   open_tickets: number
   logins_today: number
   users_today: number
@@ -89,6 +90,7 @@ interface RevenueProduct {
   amount: number
   gateway_amount?: number
   wallet_amount?: number
+  manual_amount?: number
 }
 
 interface InflowPeriod {
@@ -99,6 +101,7 @@ interface InflowPeriod {
   amount: number
   gateway_amount: number
   wallet_amount: number
+  manual_amount?: number
 }
 
 interface InflowPurpose {
@@ -108,6 +111,7 @@ interface InflowPurpose {
   amount: number
   gateway_amount: number
   wallet_amount: number
+  manual_amount?: number
 }
 
 interface ServiceRow {
@@ -221,6 +225,7 @@ const PRODUCT_COLORS: Record<string, string> = {
   haiogate: "#f59e0b",
   desktop: "#10b981",
   cdn: "#ec4899",
+  dedicated: "#8b5cf6",
 }
 
 function tomanCompact(value: number): string {
@@ -419,11 +424,15 @@ export default function DashboardPage() {
               tone="text-indigo-600"
             />
             <KpiCard
-              title="ورودی مالی (درگاه + کیف پول)"
+              title="ورودی مالی (درگاه + کیف پول + کارت‌به‌کارت)"
               value={tomanCompact(data.kpis.inflow_amount)}
               hint={`درگاه: ${tomanCompact(data.kpis.gateway_inflow_amount)} · کیف پول: ${tomanCompact(
                 data.kpis.wallet_inflow_amount
-              )}`}
+              )}${
+                (data.kpis.manual_inflow_amount ?? 0) > 0
+                  ? ` · کارت‌به‌کارت: ${tomanCompact(data.kpis.manual_inflow_amount ?? 0)}`
+                  : ""
+              }`}
               icon={CircleDollarSign}
               tone="text-emerald-600"
             />
@@ -488,7 +497,7 @@ export default function DashboardPage() {
           {/* Inflow by fixed period */}
           <ChartCard
             title="ورودی مالی در بازه‌های مختلف"
-            subtitle="همان پول واقعی (درگاه + کیف پول) در بازه‌های ثابت، مستقل از انتخاب بازه نمودارها. فقط مشتریان واقعی؛ ولت و فاکتور ادمین‌ها حذف شده است."
+            subtitle="همان پول واقعی (درگاه + کیف پول + دریافت مستقیم سرور اختصاصی) در بازه‌های ثابت، مستقل از انتخاب بازه نمودارها. فقط مشتریان واقعی؛ ولت و فاکتور ادمین‌ها حذف شده است."
             icon={CircleDollarSign}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -506,6 +515,9 @@ export default function DashboardPage() {
                   <div className="mt-1 text-[11px] text-slate-500">
                     درگاه {tomanCompact(period.gateway_amount)} · کیف پول{" "}
                     {tomanCompact(period.wallet_amount)}
+                    {(period.manual_amount ?? 0) > 0
+                      ? ` · کارت‌به‌کارت ${tomanCompact(period.manual_amount ?? 0)}`
+                      : ""}
                   </div>
                 </div>
               ))}
@@ -521,6 +533,11 @@ export default function DashboardPage() {
             <div className="grid gap-6 xl:grid-cols-2">
               <div>
                 <h4 className="mb-2 text-sm font-semibold text-slate-700">به تفکیک محصول</h4>
+                {(() => {
+                  const showManual = data.revenue_by_product.some(
+                    (row) => (row.manual_amount ?? 0) > 0
+                  )
+                  return (
                 <table className="w-full text-right text-sm">
                   <thead>
                     <tr className="text-xs text-slate-500">
@@ -528,6 +545,7 @@ export default function DashboardPage() {
                       <th className="py-1 font-medium">تعداد</th>
                       <th className="py-1 font-medium">درگاه</th>
                       <th className="py-1 font-medium">کیف پول</th>
+                      {showManual ? <th className="py-1 font-medium">کارت‌به‌کارت</th> : null}
                       <th className="py-1 font-medium">جمع</th>
                     </tr>
                   </thead>
@@ -538,14 +556,24 @@ export default function DashboardPage() {
                         <td className="py-1.5 text-slate-500">{faNum(row.count)}</td>
                         <td className="py-1.5">{tomanCompact(row.gateway_amount ?? 0)}</td>
                         <td className="py-1.5">{tomanCompact(row.wallet_amount ?? 0)}</td>
+                        {showManual ? (
+                          <td className="py-1.5">{tomanCompact(row.manual_amount ?? 0)}</td>
+                        ) : null}
                         <td className="py-1.5 font-semibold">{tomanCompact(row.amount)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                  )
+                })()}
               </div>
               <div>
                 <h4 className="mb-2 text-sm font-semibold text-slate-700">بابت چه کاری</h4>
+                {(() => {
+                  const showManual = (data.inflow_by_purpose ?? []).some(
+                    (row) => (row.manual_amount ?? 0) > 0
+                  )
+                  return (
                 <table className="w-full text-right text-sm">
                   <thead>
                     <tr className="text-xs text-slate-500">
@@ -553,6 +581,7 @@ export default function DashboardPage() {
                       <th className="py-1 font-medium">تعداد</th>
                       <th className="py-1 font-medium">درگاه</th>
                       <th className="py-1 font-medium">کیف پول</th>
+                      {showManual ? <th className="py-1 font-medium">کارت‌به‌کارت</th> : null}
                       <th className="py-1 font-medium">جمع</th>
                     </tr>
                   </thead>
@@ -563,11 +592,16 @@ export default function DashboardPage() {
                         <td className="py-1.5 text-slate-500">{faNum(row.count)}</td>
                         <td className="py-1.5">{tomanCompact(row.gateway_amount)}</td>
                         <td className="py-1.5">{tomanCompact(row.wallet_amount)}</td>
+                        {showManual ? (
+                          <td className="py-1.5">{tomanCompact(row.manual_amount ?? 0)}</td>
+                        ) : null}
                         <td className="py-1.5 font-semibold">{tomanCompact(row.amount)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                  )
+                })()}
               </div>
             </div>
           </ChartCard>
