@@ -206,7 +206,8 @@ interface DashboardData {
   campaign_days: string[]
 }
 
-const RANGES = [30, 90, 180]
+const RANGES = [1, 7, 14, 30, 90, 180]
+const RANGE_LABELS: Record<number, string> = { 1: "روزانه", 7: "۷ روز", 14: "۱۴ روز", 30: "۳۰ روز", 90: "۹۰ روز", 180: "۱۸۰ روز" }
 const CHANNEL_LABELS: Record<string, string> = {
   email: "ایمیل",
   bale: "بله",
@@ -354,7 +355,7 @@ export default function DashboardPage() {
             <p className="text-xs text-indigo-100">داشبورد مدیریت</p>
             <h2 className="mt-1 text-xl font-bold md:text-2xl">{displayName}</h2>
             <p className="mt-2 text-xs leading-6 text-indigo-100">
-              تصویر کامل {faNum(days)} روز گذشته از ثبت‌نام، احراز هویت، محصولات،
+              تصویر کامل {days === 1 ? "امروز" : `${faNum(days)} روز گذشته`} از ثبت‌نام، احراز هویت، محصولات،
               فاکتورها، تیکت‌ها، کمپین‌ها و ورود کاربران به پنل. آمار فقط شامل
               مشتریان واقعی است و حساب‌های ادمین/پشتیبانی جدا شده‌اند.
               {role ? ` دسترسی شما: ${PANEL_ROLE_LABELS[role]}.` : ""}
@@ -371,7 +372,7 @@ export default function DashboardPage() {
                     days === range ? "bg-white text-indigo-700" : "text-indigo-100 hover:bg-white/10"
                   )}
                 >
-                  {faNum(range)} روز
+                  {RANGE_LABELS[range] ?? `${faNum(range)} روز`}
                 </button>
               ))}
             </div>
@@ -411,7 +412,7 @@ export default function DashboardPage() {
           {/* KPIs */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
-              title={`ثبت‌نام ${faNum(days)} روز`}
+              title={days === 1 ? "ثبت‌نام امروز" : `ثبت‌نام ${faNum(days)} روز`}
               value={faNum(data.kpis.signups)}
               hint={`${faNum(data.kpis.verified)} احراز هویت · نرخ ${faNum(data.kpis.verification_rate)}٪`}
               icon={UserPlus}
