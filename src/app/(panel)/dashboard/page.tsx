@@ -21,10 +21,10 @@ import { useAuthStore } from "@/stores/auth-store"
 import { PANEL_ROLE_LABELS } from "@/lib/roles"
 import { cn } from "@/lib/utils"
 import {
-  DailyBarChart,
   Funnel,
   GroupedBarChart,
   HBarList,
+  StackedBarChart,
   faCompact,
   faDay,
   faMonth,
@@ -41,6 +41,9 @@ interface Kpis {
   paid_amount: number
   pending_count: number
   pending_amount: number
+  inflow_amount: number
+  gateway_inflow_amount: number
+  wallet_inflow_amount: number
   open_tickets: number
   logins_today: number
   users_today: number
@@ -153,6 +156,7 @@ interface DashboardData {
   revenue_monthly: MonthlyRevenue[]
   revenue_by_product: RevenueProduct[]
   revenue_by_product_monthly: { month: string; products: RevenueProduct[] }[]
+  revenue_by_product_daily: { date: string; products: RevenueProduct[] }[]
   products: ProductRow[]
   services: ServiceRow[]
   admin_services: {
@@ -185,6 +189,14 @@ const CHANNEL_LABELS: Record<string, string> = {
   bale: "بله",
   sms: "پیامک",
   both: "ایمیل + بله",
+}
+
+const PRODUCT_COLORS: Record<string, string> = {
+  paas: "#6366f1",
+  haioflash: "#0ea5e9",
+  haiogate: "#f59e0b",
+  desktop: "#10b981",
+  cdn: "#ec4899",
 }
 
 function tomanCompact(value: number): string {
@@ -270,6 +282,28 @@ export default function DashboardPage() {
       ? data?.revenue_by_product ?? []
       : data?.revenue_by_product_monthly.find((row) => row.month === activeMonth)?.products ?? []
 
+  const dailyProductSeries = useMemo(() => {
+    const rows = data?.revenue_by_product_daily ?? []
+    if (!rows.length) return []
+    return rows[0].products.map((product) => ({
+      key: product.key,
+      label: product.label,
+      color: PRODUCT_COLORS[product.key] ?? "#64748b",
+      values: rows.map((row) => row.products.find((item) => item.key === product.key)?.amount ?? 0),
+    }))
+  }, [data])
+
+  const monthlyProductSeries = useMemo(() => {
+    const rows = data?.revenue_by_product_monthly ?? []
+    if (!rows.length) return []
+    return rows[0].products.map((product) => ({
+      key: product.key,
+      label: product.label,
+      color: PRODUCT_COLORS[product.key] ?? "#64748b",
+      values: rows.map((row) => row.products.find((item) => item.key === product.key)?.amount ?? 0),
+    }))
+  }, [data])
+
   const displayName =
     user?.display_name ||
     [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
@@ -349,9 +383,11 @@ export default function DashboardPage() {
               tone="text-indigo-600"
             />
             <KpiCard
-              title="درآمد پرداخت‌شده"
-              value={tomanCompact(data.kpis.paid_amount)}
-              hint={`${faNum(data.kpis.paid_count)} فاکتور پرداخت‌شده`}
+              title="ورودی مالی (درگاه + کیف پول)"
+              value={tomanCompact(data.kpis.inflow_amount)}
+              hint={`درگاه: ${tomanCompact(data.kpis.gateway_inflow_amount)} · کیف پول: ${tomanCompact(
+                data.kpis.wallet_inflow_amount
+              )}`}
               icon={CircleDollarSign}
               tone="text-emerald-600"
             />
@@ -443,8 +479,8 @@ export default function DashboardPage() {
             {/* Revenue */}
             <ChartCard
               className="xl:col-span-2"
-              title="ورودی مالی"
-              subtitle="مبلغ فاکتورهای پرداخت‌شده؛ نمایش روزانه یا ماهانه. با نگه‌داشتن موس، تعداد فاکتورهای پرداختی و معلق همان بازه را ببینید."
+              title="ورودی مالی به تفکیک محصول"
+              subtitle="مبلغ فاکتورهای پرداخت‌شده؛ هر رنگ یک محصول است. نمایش روزانه یا ماهانه — با نگه‌داشتن موس، سهم هر محصول در آن روز/ماه را ببینید."
               icon={CircleDollarSign}
             >
               <div className="mb-3 flex w-fit items-center gap-1 rounded-xl bg-slate-100 p-1 text-[11px]">
@@ -472,36 +508,18 @@ export default function DashboardPage() {
                 </button>
               </div>
               {revenueMode === "daily" ? (
-                <DailyBarChart
+                <StackedBarChart
                   labels={labels}
                   bands={bands}
-                  values={data.revenue_daily.map((row) => row.paid_amount)}
-                  color="#10b981"
+                  series={dailyProductSeries}
                   formatValue={faToman}
-                  extra={(index) => {
-                    const row = data.revenue_daily[index]
-                    if (!row) return []
-                    return [
-                      { label: "فاکتور پرداختی", value: faNum(row.paid_count) },
-                      { label: "فاکتور معلق", value: faNum(row.pending_count) },
-                    ]
-                  }}
                 />
               ) : (
-                <DailyBarChart
+                <StackedBarChart
                   labels={data.revenue_monthly.map((row) => row.month)}
-                  values={data.revenue_monthly.map((row) => row.paid_amount)}
+                  series={monthlyProductSeries}
                   labelFormat={faMonth}
-                  color="#0d9488"
                   formatValue={faToman}
-                  extra={(index) => {
-                    const row = data.revenue_monthly[index]
-                    if (!row) return []
-                    return [
-                      { label: "فاکتور پرداختی", value: faNum(row.paid_count) },
-                      { label: "فاکتور معلق", value: faNum(row.pending_count) },
-                    ]
-                  }}
                 />
               )}
             </ChartCard>

@@ -494,6 +494,144 @@ export function DailyBarChart({
   )
 }
 
+export function StackedBarChart({
+  labels,
+  series,
+  bands = [],
+  height = 240,
+  formatValue = faNum,
+  labelFormat = faDay,
+}: {
+  labels: string[]
+  series: { key: string; label: string; color: string; values: number[] }[]
+  bands?: ChartBand[]
+  height?: number
+  formatValue?: (value: number) => string
+  labelFormat?: (label: string) => string
+}) {
+  const width = 900
+  const pad = { left: 58, right: 14, top: 14, bottom: 28 }
+  const { index, setIndex, onMove } = useHoverIndex(labels.length)
+  const totals = labels.map((_, i) => series.reduce((sum, s) => sum + (s.values[i] ?? 0), 0))
+  const max = niceMax(Math.max(1, ...totals))
+  const plotW = width - pad.left - pad.right
+  const plotH = height - pad.top - pad.bottom
+  const step = plotW / Math.max(1, labels.length)
+  const barW = Math.max(3, step * 0.62)
+  const x = (i: number) => pad.left + i * step + step / 2
+  const y = (v: number) => pad.top + (1 - v / max) * plotH
+
+  const xLabelIndices = useMemo(() => {
+    const stepN = Math.max(1, Math.ceil(labels.length / 6))
+    const out: number[] = []
+    for (let i = 0; i < labels.length; i += stepN) out.push(i)
+    if (out[out.length - 1] !== labels.length - 1) out.push(labels.length - 1)
+    return out
+  }, [labels.length])
+
+  return (
+    <div className="relative" dir="ltr">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-auto w-full"
+        onMouseMove={(e) => onMove(e, width, pad.left, pad.right)}
+        onMouseLeave={() => setIndex(null)}
+        role="img"
+      >
+        {bands.map((band, i) => (
+          <rect
+            key={`band-${i}`}
+            x={pad.left + Math.max(0, band.start) * step}
+            y={pad.top}
+            width={Math.max(2, (Math.min(labels.length - 1, band.end) - Math.max(0, band.start) + 1) * step)}
+            height={plotH}
+            fill="#6366f1"
+            opacity={0.07}
+          >
+            <title>{band.label}</title>
+          </rect>
+        ))}
+        {yTicks(max).map((tick) => (
+          <g key={`t-${tick}`}>
+            <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} stroke="#e2e8f0" />
+            <text x={pad.left - 8} y={y(tick) + 4} textAnchor="end" className="fill-slate-400" fontSize={10}>
+              {faCompact(tick)}
+            </text>
+          </g>
+        ))}
+        {labels.map((_, i) => {
+          let base = 0
+          return (
+            <g key={`col-${i}`}>
+              {series.map((s) => {
+                const value = s.values[i] ?? 0
+                if (value <= 0) return null
+                const top = y(base + value)
+                const bottom = y(base)
+                base += value
+                return (
+                  <rect
+                    key={`seg-${s.key}-${i}`}
+                    x={x(i) - barW / 2}
+                    y={top}
+                    width={barW}
+                    height={Math.max(0, bottom - top)}
+                    fill={s.color}
+                    opacity={index === null || index === i ? 0.95 : 0.35}
+                  />
+                )
+              })}
+            </g>
+          )
+        })}
+        {index !== null ? (
+          <rect
+            x={pad.left + index * step}
+            y={pad.top}
+            width={step}
+            height={plotH}
+            fill="#0f172a"
+            opacity={0.04}
+          />
+        ) : null}
+        {xLabelIndices.map((i) => (
+          <text key={`x-${i}`} x={x(i)} y={height - 8} textAnchor="middle" className="fill-slate-400" fontSize={10}>
+            {labelFormat(labels[i])}
+          </text>
+        ))}
+      </svg>
+      {index !== null ? (
+        <div
+          className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[11px] shadow-lg"
+          style={{ left: `${(x(index) / width) * 100}%` }}
+        >
+          <p className="mb-1 font-bold text-slate-700">{labelFormat(labels[index])}</p>
+          {series
+            .filter((s) => (s.values[index] ?? 0) > 0)
+            .map((s) => (
+              <p key={s.key} className="flex items-center gap-1.5 whitespace-nowrap text-slate-600">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: s.color }} />
+                {s.label}:{" "}
+                <span className="font-bold text-slate-800">{formatValue(s.values[index] ?? 0)}</span>
+              </p>
+            ))}
+          <p className="mt-1 border-t border-slate-100 pt-1 whitespace-nowrap text-slate-700">
+            مجموع: <span className="font-bold">{formatValue(totals[index])}</span>
+          </p>
+        </div>
+      ) : null}
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-4" dir="rtl">
+        {series.map((s) => (
+          <span key={s.key} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: s.color }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function HBarList({
   items,
   emptyLabel = "داده‌ای نیست",
