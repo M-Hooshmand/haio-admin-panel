@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 
+const REFRESH_COOKIE_NAME = "haio_admin_refresh";
+
 const BACKEND = process.env.BACKEND_API_URL ?? "https://portal.haio.ir";
 
-const FORWARD_REQUEST_HEADERS = [
-  "authorization",
+const PROXIED_REQUEST_HEADERS = [
   "content-type",
   "accept",
   "accept-language",
-  "cookie",
   "user-agent",
 ];
 
@@ -28,10 +28,13 @@ async function proxy(
   const target = `${BACKEND}/api/v1/${path.join("/")}/${search}`;
 
   const headers = new Headers();
-  for (const name of FORWARD_REQUEST_HEADERS) {
+  for (const name of PROXIED_REQUEST_HEADERS) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
+
+  const token = await resolveAccessToken(request);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const method = request.method.toUpperCase();
   const body =
@@ -93,3 +96,38 @@ export const PATCH = proxy;
 export const DELETE = proxy;
 export const OPTIONS = proxy;
 export const HEAD = proxy;
+
+const BACKEND_REFRESH_PATH = "auth/refresh/";
+
+async function exchangeRefreshToken(refresh: string): Promise<{ access?: string; refresh?: string } | null> {
+  try {
+    const upstream = await fetch(`${BACKEND}/api/v1/${BACKEND_REFRESH_PATH}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh }),
+      cache: "no-store",
+    });
+    if (!upstream.ok) return null;
+    return (await upstream.json()) as { access?: string; refresh?: string };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveAccessToken(request: NextRequest): Promise<string | null> {
+  const auth = request.headers.get("authorization");
+  if (auth) {
+    const [scheme, token] = auth.split(" ");
+    if (scheme && token && scheme.toLowerCase() === "bearer") {
+      return token;
+    }
+  }
+
+  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  if (!refreshToken) return null;
+
+  const exchanged = await exchangeRefreshToken(refreshToken);
+  if (!exchanged?.access) return null;
+
+  return exchanged.access;
+}
