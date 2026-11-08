@@ -115,6 +115,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "FINANCE", "SALES"],
   },
   {
+    key: "dedicated",
+    href: "/dedicated",
+    title: "سرورهای اختصاصی",
+    description: "فروش سرور اختصاصی (برمتال) و فاکتور خودکار دوره بعدی",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE"],
+  },
+  {
     key: "haioflash",
     href: "/haioflash",
     title: "هایوفلش",
