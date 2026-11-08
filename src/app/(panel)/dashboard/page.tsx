@@ -166,6 +166,7 @@ interface DashboardData {
   revenue_monthly: MonthlyRevenue[]
   revenue_by_product: RevenueProduct[]
   revenue_by_product_monthly: { month: string; products: RevenueProduct[] }[]
+  inflow_by_month: { month: string; products: RevenueProduct[] }[]
   revenue_by_product_daily: { date: string; products: RevenueProduct[] }[]
   inflow_periods: InflowPeriod[]
   products: ProductRow[]
@@ -304,7 +305,7 @@ export default function DashboardPage() {
   }, [data])
 
   const monthlyProductSeries = useMemo(() => {
-    const rows = data?.revenue_by_product_monthly ?? []
+    const rows = data?.inflow_by_month ?? data?.revenue_by_product_monthly ?? []
     if (!rows.length) return []
     return rows[0].products.map((product) => ({
       key: product.key,
@@ -551,7 +552,7 @@ export default function DashboardPage() {
                 />
               ) : (
                 <StackedBarChart
-                  labels={data.revenue_monthly.map((row) => row.month)}
+                  labels={(data.inflow_by_month ?? data.revenue_monthly.map((row) => ({ month: row.month }))).map((row) => row.month)}
                   series={monthlyProductSeries}
                   labelFormat={faMonth}
                   formatValue={faToman}
