@@ -480,7 +480,7 @@ export default function DashboardPage() {
             <ChartCard
               className="xl:col-span-2"
               title="ورودی مالی به تفکیک محصول"
-              subtitle="مبلغ فاکتورهای پرداخت‌شده؛ هر رنگ یک محصول است. نمایش روزانه یا ماهانه — با نگه‌داشتن موس، سهم هر محصول در آن روز/ماه را ببینید."
+              subtitle="پرداخت موفق درگاه + تسویه با کیف پول، فقط برای مشتریان واقعی (ولت و فاکتور ادمین‌ها حذف شده). هر رنگ یک محصول است؛ روزانه یا ماهانه — با نگه‌داشتن موس سهم هر محصول را ببینید."
               icon={CircleDollarSign}
             >
               <div className="mb-3 flex w-fit items-center gap-1 rounded-xl bg-slate-100 p-1 text-[11px]">
