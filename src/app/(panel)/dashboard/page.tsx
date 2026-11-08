@@ -87,12 +87,23 @@ interface RevenueProduct {
   label: string
   count: number
   amount: number
+  gateway_amount?: number
+  wallet_amount?: number
 }
 
 interface InflowPeriod {
   key: string
   label: string
   days: number
+  count: number
+  amount: number
+  gateway_amount: number
+  wallet_amount: number
+}
+
+interface InflowPurpose {
+  key: string
+  label: string
   count: number
   amount: number
   gateway_amount: number
@@ -169,6 +180,7 @@ interface DashboardData {
   inflow_by_month: { month: string; products: RevenueProduct[] }[]
   revenue_by_product_daily: { date: string; products: RevenueProduct[] }[]
   inflow_periods: InflowPeriod[]
+  inflow_by_purpose: InflowPurpose[]
   products: ProductRow[]
   services: ServiceRow[]
   admin_services: {
@@ -223,24 +235,36 @@ export default function DashboardPage() {
   const [revenueMode, setRevenueMode] = useState<"daily" | "monthly">("daily")
   const [productMonth, setProductMonth] = useState<string>("latest")
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const { data: payload } = await api.get<DashboardData>("/panel/dashboard/", {
-        params: { days },
-      })
-      setData(payload)
-    } catch (err) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(detail || "دریافت آمار داشبورد ناموفق بود.")
-    } finally {
-      setLoading(false)
-    }
-  }, [days])
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true)
+      setError(null)
+      try {
+        const { data: payload } = await api.get<DashboardData>("/panel/dashboard/", {
+          params: { days },
+        })
+        setData(payload)
+      } catch (err) {
+        const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        setError(detail || "دریافت آمار داشبورد ناموفق بود.")
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    [days]
+  )
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  // Money figures are read live: refresh quietly every minute so a new
+  // gateway payment or wallet settlement shows up without a page reload.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void load(true)
+    }, 60_000)
+    return () => window.clearInterval(timer)
   }, [load])
 
   const labels = useMemo(() => data?.signups_daily.map((row) => row.date) ?? [], [data])
@@ -472,7 +496,9 @@ export default function DashboardPage() {
                   key={period.key}
                   className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
                 >
-                  <div className="text-xs font-medium text-slate-500">{period.label}</div>
+                  <div className="text-xs font-medium text-slate-500">
+                    {period.days === 1 ? `امروز (${faDay(data.range.to)})` : period.label}
+                  </div>
                   <div className="mt-1 text-lg font-bold text-slate-800">
                     {tomanCompact(period.amount)}
                   </div>
@@ -482,6 +508,66 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </ChartCard>
+
+          {/* Inflow split: product + purpose, gateway vs wallet */}
+          <ChartCard
+            title="تفکیک ورودی مالی: درگاه و کیف پول"
+            subtitle="هر ریال ورودی به تفکیک منبع پرداخت (درگاه یا کیف پول)، محصول و نوع خرید در بازه انتخاب‌شده. فقط مشتریان واقعی."
+            icon={CircleDollarSign}
+          >
+            <div className="grid gap-6 xl:grid-cols-2">
+              <div>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">به تفکیک محصول</h4>
+                <table className="w-full text-right text-sm">
+                  <thead>
+                    <tr className="text-xs text-slate-500">
+                      <th className="py-1 font-medium">محصول</th>
+                      <th className="py-1 font-medium">تعداد</th>
+                      <th className="py-1 font-medium">درگاه</th>
+                      <th className="py-1 font-medium">کیف پول</th>
+                      <th className="py-1 font-medium">جمع</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.revenue_by_product.map((row) => (
+                      <tr key={row.key} className="border-t border-slate-100">
+                        <td className="py-1.5">{row.label}</td>
+                        <td className="py-1.5 text-slate-500">{faNum(row.count)}</td>
+                        <td className="py-1.5">{tomanCompact(row.gateway_amount ?? 0)}</td>
+                        <td className="py-1.5">{tomanCompact(row.wallet_amount ?? 0)}</td>
+                        <td className="py-1.5 font-semibold">{tomanCompact(row.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">بابت چه کاری</h4>
+                <table className="w-full text-right text-sm">
+                  <thead>
+                    <tr className="text-xs text-slate-500">
+                      <th className="py-1 font-medium">نوع خرید</th>
+                      <th className="py-1 font-medium">تعداد</th>
+                      <th className="py-1 font-medium">درگاه</th>
+                      <th className="py-1 font-medium">کیف پول</th>
+                      <th className="py-1 font-medium">جمع</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.inflow_by_purpose ?? []).map((row) => (
+                      <tr key={row.key} className="border-t border-slate-100">
+                        <td className="py-1.5">{row.label}</td>
+                        <td className="py-1.5 text-slate-500">{faNum(row.count)}</td>
+                        <td className="py-1.5">{tomanCompact(row.gateway_amount)}</td>
+                        <td className="py-1.5">{tomanCompact(row.wallet_amount)}</td>
+                        <td className="py-1.5 font-semibold">{tomanCompact(row.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </ChartCard>
 
