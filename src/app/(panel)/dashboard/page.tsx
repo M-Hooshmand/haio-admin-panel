@@ -89,6 +89,16 @@ interface RevenueProduct {
   amount: number
 }
 
+interface InflowPeriod {
+  key: string
+  label: string
+  days: number
+  count: number
+  amount: number
+  gateway_amount: number
+  wallet_amount: number
+}
+
 interface ServiceRow {
   key: string
   label: string
@@ -157,6 +167,7 @@ interface DashboardData {
   revenue_by_product: RevenueProduct[]
   revenue_by_product_monthly: { month: string; products: RevenueProduct[] }[]
   revenue_by_product_daily: { date: string; products: RevenueProduct[] }[]
+  inflow_periods: InflowPeriod[]
   products: ProductRow[]
   services: ServiceRow[]
   admin_services: {
@@ -183,7 +194,6 @@ interface DashboardData {
 }
 
 const RANGES = [30, 90, 180]
-
 const CHANNEL_LABELS: Record<string, string> = {
   email: "ایمیل",
   bale: "بله",
@@ -448,6 +458,31 @@ export default function DashboardPage() {
               tone="text-slate-600"
             />
           </div>
+
+          {/* Inflow by fixed period */}
+          <ChartCard
+            title="ورودی مالی در بازه‌های مختلف"
+            subtitle="همان پول واقعی (درگاه + کیف پول) در بازه‌های ثابت، مستقل از انتخاب بازه نمودارها. فقط مشتریان واقعی؛ ولت و فاکتور ادمین‌ها حذف شده است."
+            icon={CircleDollarSign}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              {(data.inflow_periods ?? []).map((period) => (
+                <div
+                  key={period.key}
+                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
+                >
+                  <div className="text-xs font-medium text-slate-500">{period.label}</div>
+                  <div className="mt-1 text-lg font-bold text-slate-800">
+                    {tomanCompact(period.amount)}
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    درگاه {tomanCompact(period.gateway_amount)} · کیف پول{" "}
+                    {tomanCompact(period.wallet_amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ChartCard>
 
           {/* Signups + verification */}
           <ChartCard
