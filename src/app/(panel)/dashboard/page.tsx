@@ -50,6 +50,8 @@ interface Kpis {
   users_today: number
   logins_unique: number
   logins_returning: number
+  page_views_today: number
+  page_view_users_today: number
   campaigns: number
   active_services: number
   admin_services: number
@@ -64,6 +66,20 @@ interface DailySignup {
 interface DailyLogin {
   date: string
   logins: number
+  users: number
+}
+
+interface DailyPageViews {
+  date: string
+  views: number
+  users: number
+  sections: Record<string, { views: number; users: number }>
+}
+
+interface PageSectionRow {
+  key: string
+  label: string
+  views: number
   users: number
 }
 
@@ -177,6 +193,8 @@ interface DashboardData {
   kpis: Kpis
   signups_daily: DailySignup[]
   logins_daily: DailyLogin[]
+  page_views_daily: DailyPageViews[]
+  page_sections: PageSectionRow[]
   revenue_daily: DailyRevenue[]
   revenue_monthly: MonthlyRevenue[]
   revenue_by_product: RevenueProduct[]
@@ -227,6 +245,18 @@ const PRODUCT_COLORS: Record<string, string> = {
   cdn: "#ec4899",
   dedicated: "#8b5cf6",
 }
+
+const PAGE_COLORS = [
+  "#6366f1",
+  "#0ea5e9",
+  "#f59e0b",
+  "#10b981",
+  "#ec4899",
+  "#8b5cf6",
+  "#14b8a6",
+  "#ef4444",
+  "#64748b",
+]
 
 function tomanCompact(value: number): string {
   return `${faCompact(value)} تومان`
@@ -352,6 +382,38 @@ export default function DashboardPage() {
     }))
   }, [data])
 
+  // Page traffic: the chart shows the six busiest sections plus «سایر صفحات»,
+  // while the table below lists every section with its unique-user count.
+  const pageViewSeries = useMemo(() => {
+    const rows = data?.page_views_daily ?? []
+    if (!rows.length) return []
+    const ordered = [...(data?.page_sections ?? [])].sort((a, b) => b.views - a.views)
+    const top = ordered.slice(0, 6)
+    const rest = ordered.slice(6).map((row) => row.key)
+    const series = top.map((row, index) => ({
+      key: row.key,
+      label: row.label,
+      color: PAGE_COLORS[index % PAGE_COLORS.length],
+      values: rows.map((day) => day.sections[row.key]?.views ?? 0),
+    }))
+    if (rest.length) {
+      series.push({
+        key: "other_pages",
+        label: "سایر صفحات",
+        color: "#64748b",
+        values: rows.map((day) =>
+          rest.reduce((sum, key) => sum + (day.sections[key]?.views ?? 0), 0)
+        ),
+      })
+    }
+    return series
+  }, [data])
+
+  const pageViewTotal = useMemo(
+    () => (data?.page_sections ?? []).reduce((sum, row) => sum + row.views, 0),
+    [data]
+  )
+
   const displayName =
     user?.display_name ||
     [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
@@ -456,6 +518,13 @@ export default function DashboardPage() {
               hint={`${faNum(data.kpis.users_today)} کاربر یکتا`}
               icon={Activity}
               tone="text-sky-600"
+            />
+            <KpiCard
+              title="بازدید امروز از پنل"
+              value={faNum(data.kpis.page_views_today ?? 0)}
+              hint={`${faNum(data.kpis.page_view_users_today ?? 0)} کاربر یکتا`}
+              icon={Activity}
+              tone="text-cyan-600"
             />
             <KpiCard
               title="تیکت باز"
@@ -897,6 +966,55 @@ export default function DashboardPage() {
               {faNum(data.kpis.logins_returning)} نفرشان قبل از این بازه ثبت‌نام کرده
               بودند. به همین دلیل «کاربر یکتا» با «ثبت‌نام روزانه» برابر نیست: هر
               ثبت‌نام جدید قطعاً یک ورود است، اما ورودها شامل مشتریان قدیمی هم می‌شود.
+            </p>
+          </ChartCard>
+
+          {/* Page traffic */}
+          <ChartCard
+            title="بازدید روزانه از پنل (به تفکیک صفحه)"
+            subtitle="هر صفحه‌ای که مشتری در my.haio.ir باز می‌کند ثبت می‌شود؛ بازدیدهای تکراریِ ماندن روی یک صفحه حذف شده‌اند. فقط مشتریان واقعی — بازدیدهای ادمین شمرده نمی‌شود."
+            icon={Activity}
+          >
+            <StackedBarChart labels={labels} bands={bands} series={pageViewSeries} />
+            <div className="mt-4 max-h-[340px] overflow-auto rounded-xl border border-slate-100">
+              <table className="w-full text-right text-xs">
+                <thead className="sticky top-0 bg-slate-50 text-[11px] text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">صفحه</th>
+                    <th className="px-3 py-2 font-medium">بازدید</th>
+                    <th className="px-3 py-2 font-medium">کاربر یکتا</th>
+                    <th className="px-3 py-2 font-medium">سهم</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.page_sections.length ? (
+                    data.page_sections.map((row) => (
+                      <tr key={row.key} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-700">{row.label}</td>
+                        <td className="px-3 py-2 text-slate-600">{faNum(row.views)}</td>
+                        <td className="px-3 py-2 text-slate-600">{faNum(row.users)}</td>
+                        <td className="px-3 py-2 text-slate-500">
+                          {faNum(
+                            pageViewTotal
+                              ? Math.round((row.views / pageViewTotal) * 1000) / 10
+                              : 0
+                          )}
+                          ٪
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-6 text-center text-slate-400">
+                        هنوز بازدیدی ثبت نشده است.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 rounded-xl bg-slate-50 p-3 text-[11px] leading-5 text-slate-500">
+              در این بازه {faNum(pageViewTotal)} بازدید از {faNum(data.page_sections.length)} صفحه ثبت شده است.
             </p>
           </ChartCard>
 
