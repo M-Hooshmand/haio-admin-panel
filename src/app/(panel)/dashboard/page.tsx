@@ -52,6 +52,7 @@ interface Kpis {
   logins_returning: number
   page_views_today: number
   page_view_users_today: number
+  active_users_today: number
   campaigns: number
   active_services: number
   admin_services: number
@@ -522,7 +523,9 @@ export default function DashboardPage() {
             <KpiCard
               title="بازدید امروز از پنل"
               value={faNum(data.kpis.page_views_today ?? 0)}
-              hint={`${faNum(data.kpis.page_view_users_today ?? 0)} کاربر یکتا`}
+              hint={`${faNum(data.kpis.page_view_users_today ?? 0)} کاربر یکتا · ${faNum(
+                data.kpis.active_users_today ?? 0
+              )} فعال امروز`}
               icon={Activity}
               tone="text-cyan-600"
             />
@@ -972,7 +975,7 @@ export default function DashboardPage() {
           {/* Page traffic */}
           <ChartCard
             title="بازدید روزانه از پنل (به تفکیک صفحه)"
-            subtitle="هر صفحه‌ای که مشتری در my.haio.ir باز می‌کند ثبت می‌شود؛ بازدیدهای تکراریِ ماندن روی یک صفحه حذف شده‌اند. فقط مشتریان واقعی — بازدیدهای ادمین شمرده نمی‌شود."
+            subtitle="همان منبع صفحه «مونیتورینگ کاربران»: هر کاربر فعال، صفحه‌ای که در my.haio.ir باز کرده ثبت می‌شود (روزی یک رکورد برای هر کاربر/صفحه). فقط مشتریان واقعی — ادمین‌ها شمرده نمی‌شوند."
             icon={Activity}
           >
             <StackedBarChart labels={labels} bands={bands} series={pageViewSeries} />
