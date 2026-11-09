@@ -1074,7 +1074,7 @@ export default function DashboardPage() {
           {/* Campaign comparison */}
           <ChartCard
             title="کمپین‌ها و اثرشان"
-            subtitle="درآمد هر کمپین = پرداخت‌های خودِ دریافت‌کنندگانِ همان کمپین بعد از ارسال پیام (نه درآمد کل پلتفرم)."
+            subtitle="همه اعداد فقط مربوط به گیرندگان همان کمپین است (تطبیق با موبایل/کاربر)، بعد از اولین ارسال. «خرید محصول (پرداخت‌شده)» = تعداد فاکتورهای پرداخت‌شده‌ی همان محصول توسط گیرندگان؛ «فاکتور پرداختی» = همه فاکتورهای پرداخت‌شده‌ی گیرندگان (هر محصول) و «درآمد» = مبلغ همان‌ها. اعداد کل پلتفرم اینجا نمی‌آید."
             icon={Megaphone}
           >
             {activeCampaigns.length ? (
@@ -1088,7 +1088,7 @@ export default function DashboardPage() {
                       <th className="py-2 font-medium">روزهای ارسال</th>
                       <th className="py-2 font-medium">ارسال</th>
                       <th className="py-2 font-medium">ثبت‌نام</th>
-                      <th className="py-2 font-medium">خرید محصول</th>
+                      <th className="py-2 font-medium">خرید محصول (پرداخت‌شده)</th>
                       <th className="py-2 font-medium">فاکتور پرداختی</th>
                       <th className="py-2 font-medium">درآمد</th>
                     </tr>
