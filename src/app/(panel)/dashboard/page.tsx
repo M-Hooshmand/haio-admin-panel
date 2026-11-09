@@ -52,7 +52,7 @@ interface Kpis {
   logins_returning: number
   page_views_today: number
   page_view_users_today: number
-  active_users_today: number
+  active_users_today?: number
   campaigns: number
   active_services: number
   admin_services: number
@@ -415,6 +415,24 @@ export default function DashboardPage() {
     [data]
   )
 
+  // Day-by-day view: "who came and where they went" per day, newest first.
+  const pageDays = useMemo(() => {
+    const rows = data?.page_views_daily ?? []
+    const labelsByKey = new Map((data?.page_sections ?? []).map((row) => [row.key, row.label]))
+    return [...rows]
+      .filter((row) => row.views > 0)
+      .reverse()
+      .map((row) => ({
+        date: row.date,
+        views: row.views,
+        users: row.users,
+        top: Object.entries(row.sections)
+          .sort((a, b) => b[1].views - a[1].views)
+          .slice(0, 3)
+          .map(([key, value]) => `${labelsByKey.get(key) ?? key} (${faNum(value.views)})`),
+      }))
+  }, [data])
+
   const displayName =
     user?.display_name ||
     [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
@@ -523,9 +541,7 @@ export default function DashboardPage() {
             <KpiCard
               title="بازدید امروز از پنل"
               value={faNum(data.kpis.page_views_today ?? 0)}
-              hint={`${faNum(data.kpis.page_view_users_today ?? 0)} کاربر یکتا · ${faNum(
-                data.kpis.active_users_today ?? 0
-              )} فعال امروز`}
+              hint={`${faNum(data.kpis.page_view_users_today ?? 0)} کاربر یکتا`}
               icon={Activity}
               tone="text-cyan-600"
             />
@@ -975,11 +991,45 @@ export default function DashboardPage() {
           {/* Page traffic */}
           <ChartCard
             title="بازدید روزانه از پنل (به تفکیک صفحه)"
-            subtitle="همان منبع صفحه «مونیتورینگ کاربران»: هر کاربر فعال، صفحه‌ای که در my.haio.ir باز کرده ثبت می‌شود (روزی یک رکورد برای هر کاربر/صفحه). فقط مشتریان واقعی — ادمین‌ها شمرده نمی‌شوند."
+            subtitle="تاریخچه بازدید صفحات پنل مشتری (my.haio.ir) — امروز و روزهای گذشته. هر کاربر در هر روز برای هر صفحه‌ای که باز کند یک بار شمرده می‌شود؛ آمار لحظه‌ای در تب «مونیتورینگ کاربران» است. فقط مشتریان واقعی."
             icon={Activity}
           >
             <StackedBarChart labels={labels} bands={bands} series={pageViewSeries} />
-            <div className="mt-4 max-h-[340px] overflow-auto rounded-xl border border-slate-100">
+
+            <h3 className="mb-2 mt-5 text-xs font-bold text-slate-700">روز به روز — کجا رفتند</h3>
+            <div className="max-h-[280px] overflow-auto rounded-xl border border-slate-100">
+              <table className="w-full text-right text-xs">
+                <thead className="sticky top-0 bg-slate-50 text-[11px] text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">تاریخ</th>
+                    <th className="px-3 py-2 font-medium">بازدید</th>
+                    <th className="px-3 py-2 font-medium">کاربر یکتا</th>
+                    <th className="px-3 py-2 font-medium">پرترددترین صفحات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageDays.length ? (
+                    pageDays.map((row) => (
+                      <tr key={row.date} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-medium text-slate-700">{faDay(row.date)}</td>
+                        <td className="px-3 py-2 text-slate-600">{faNum(row.views)}</td>
+                        <td className="px-3 py-2 text-slate-600">{faNum(row.users)}</td>
+                        <td className="px-3 py-2 text-slate-500">{row.top.join(" · ")}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-6 text-center text-slate-400">
+                        هنوز بازدیدی ثبت نشده است.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="mb-2 mt-5 text-xs font-bold text-slate-700">جمع بازه — به تفکیک صفحه</h3>
+            <div className="max-h-[340px] overflow-auto rounded-xl border border-slate-100">
               <table className="w-full text-right text-xs">
                 <thead className="sticky top-0 bg-slate-50 text-[11px] text-slate-500">
                   <tr>
