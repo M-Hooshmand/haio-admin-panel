@@ -337,7 +337,14 @@ export default function DashboardPage() {
   const monthlyProductSeries = useMemo(() => {
     const rows = data?.inflow_by_month ?? data?.revenue_by_product_monthly ?? []
     if (!rows.length) return []
-    return rows[0].products.map((product) => ({
+    // Only products that actually have a revenue source in this range — the
+    // backend product catalogue also lists placeholder lines (Pass, Iraj)
+    // that never carry money and would show up as empty legend entries.
+    const allowed = new Set((data?.revenue_by_product ?? []).map((row) => row.key))
+    const products = allowed.size
+      ? rows[0].products.filter((product) => allowed.has(product.key))
+      : rows[0].products
+    return products.map((product) => ({
       key: product.key,
       label: product.label,
       color: PRODUCT_COLORS[product.key] ?? "#64748b",
