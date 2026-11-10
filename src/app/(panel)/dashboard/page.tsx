@@ -246,6 +246,7 @@ const PRODUCT_COLORS: Record<string, string> = {
   cdn: "#ec4899",
   dedicated: "#8b5cf6",
   wordpress: "#0d9488",
+  android: "#22c55e",
 }
 
 const PAGE_COLORS = [
