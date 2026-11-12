@@ -215,6 +215,80 @@ interface DedicatedRow {
   created_at: string
 }
 
+interface AdminPlanRegionOption {
+  id: string
+  name: string
+  slug: string
+  is_active: boolean
+}
+
+interface AdminPlanRegion {
+  region_id: string
+  region_name: string
+  region_slug: string
+  region_is_active: boolean
+  is_available: boolean
+  price_override: number | null
+  traffic_override: number | null
+}
+
+interface AdminPlan {
+  id: string
+  name: string
+  slug: string
+  description: string
+  plan_type: string
+  plan_type_display: string
+  vcpus: number
+  memory_mib: number
+  storage_gib: number
+  traffic_bytes: number
+  traffic_gb: number
+  bandwidth_ingress_mbps: number | null
+  bandwidth_egress_mbps: number | null
+  price_per_month: number
+  price_hourly: number | null
+  hourly_enabled: boolean
+  max_vms_per_org: number | null
+  is_active: boolean
+  sort_order: number
+  regions: AdminPlanRegion[]
+}
+
+interface PlansPayload {
+  count: number
+  regions: AdminPlanRegionOption[]
+  results: AdminPlan[]
+}
+
+interface PlanFormRegion {
+  region_id: string
+  region_name: string
+  region_slug: string
+  is_available: boolean
+  price_override: string
+}
+
+interface PlanFormState {
+  name: string
+  slug: string
+  description: string
+  plan_type: string
+  vcpus: string
+  memory_mib: string
+  storage_gib: string
+  traffic_gb: string
+  bandwidth_ingress_mbps: string
+  bandwidth_egress_mbps: string
+  price_per_month: string
+  price_hourly: string
+  hourly_enabled: boolean
+  max_vms_per_org: string
+  sort_order: string
+  is_active: boolean
+  regions: PlanFormRegion[]
+}
+
 interface HistClaim {
   id: string
   name: string
@@ -303,6 +377,83 @@ const IP_STATE_STYLE: Record<string, { label: string; chip: string }> = {
   stale: { label: "نیازمند بازپس‌گیری", chip: "bg-amber-50 text-amber-700" },
   dedicated: { label: "سرور اختصاصی", chip: "bg-indigo-50 text-indigo-700" },
   unregistered: { label: "خارج از استخر", chip: "bg-slate-100 text-slate-500" },
+}
+
+const PLAN_TYPE_OPTIONS = [
+  { value: "general_purpose", label: "عمومی" },
+  { value: "traffic_optimized", label: "ترافیک بالا" },
+  { value: "cpu_intensive", label: "پردازشی" },
+  { value: "ram_intensive", label: "حافظه بالا" },
+  { value: "storage_optimized", label: "استوریج" },
+]
+
+function emptyPlanForm(options: AdminPlanRegionOption[]): PlanFormState {
+  return {
+    name: "",
+    slug: "",
+    description: "",
+    plan_type: "general_purpose",
+    vcpus: "1",
+    memory_mib: "512",
+    storage_gib: "10",
+    traffic_gb: "100",
+    bandwidth_ingress_mbps: "100",
+    bandwidth_egress_mbps: "100",
+    price_per_month: "",
+    price_hourly: "",
+    hourly_enabled: false,
+    max_vms_per_org: "",
+    sort_order: "0",
+    is_active: true,
+    regions: options.map((option) => ({
+      region_id: option.id,
+      region_name: option.name,
+      region_slug: option.slug,
+      is_available: true,
+      price_override: "",
+    })),
+  }
+}
+
+function planToForm(plan: AdminPlan, options: AdminPlanRegionOption[]): PlanFormState {
+  return {
+    name: plan.name,
+    slug: plan.slug,
+    description: plan.description,
+    plan_type: plan.plan_type,
+    vcpus: String(plan.vcpus),
+    memory_mib: String(plan.memory_mib),
+    storage_gib: String(plan.storage_gib),
+    traffic_gb: String(plan.traffic_gb),
+    bandwidth_ingress_mbps: plan.bandwidth_ingress_mbps != null ? String(plan.bandwidth_ingress_mbps) : "",
+    bandwidth_egress_mbps: plan.bandwidth_egress_mbps != null ? String(plan.bandwidth_egress_mbps) : "",
+    price_per_month: String(plan.price_per_month),
+    price_hourly: plan.price_hourly != null ? String(plan.price_hourly) : "",
+    hourly_enabled: plan.hourly_enabled,
+    max_vms_per_org: plan.max_vms_per_org != null ? String(plan.max_vms_per_org) : "",
+    sort_order: String(plan.sort_order),
+    is_active: plan.is_active,
+    regions: options.map((option) => {
+      const row = plan.regions.find((item) => item.region_id === option.id)
+      return {
+        region_id: option.id,
+        region_name: option.name,
+        region_slug: option.slug,
+        is_available: row?.is_available ?? true,
+        price_override: row?.price_override != null ? String(row.price_override) : "",
+      }
+    }),
+  }
+}
+
+function planMemory(mib: number): string {
+  return mib >= 1024 ? `${formatNumber(mib / 1024)} GB` : `${formatNumber(mib)} MB`
+}
+
+function planPrice(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—"
+  if (value === 0) return "رایگان"
+  return formatToman(value)
 }
 
 const faNumber = new Intl.NumberFormat("fa-IR")
@@ -543,8 +694,9 @@ export default function HaioflashPage() {
     [user],
   )
 
-  const [tab, setTab] = useState<"vms" | "ips" | "dedicated" | "history">("vms")
+  const [tab, setTab] = useState<"vms" | "plans" | "ips" | "dedicated" | "history">("vms")
   const fetchVmsRef = useRef(0)
+  const fetchPlansRef = useRef(0)
   const fetchIpsRef = useRef(0)
   const fetchHistRef = useRef(0)
   const fetchDedRef = useRef(0)
@@ -576,6 +728,16 @@ export default function HaioflashPage() {
   const [dedNote, setDedNote] = useState("")
   const [dedSaving, setDedSaving] = useState(false)
   const [dedRowEditing, setDedRowEditing] = useState<DedicatedRow | null>(null)
+
+  // --- plans ---------------------------------------------------------------
+  const [plansData, setPlansData] = useState<AdminPlan[] | null>(null)
+  const [plansRegions, setPlansRegions] = useState<AdminPlanRegionOption[]>([])
+  const [plansLoading, setPlansLoading] = useState(false)
+  const [plansError, setPlansError] = useState("")
+  const [planSaving, setPlanSaving] = useState(false)
+  const [planFormOpen, setPlanFormOpen] = useState(false)
+  const [planEditing, setPlanEditing] = useState<AdminPlan | null>(null)
+  const [planForm, setPlanForm] = useState<PlanFormState>(() => emptyPlanForm([]))
 
   // --- IP history ---------------------------------------------------------
   const [histInput, setHistInput] = useState("")
@@ -709,6 +871,125 @@ export default function HaioflashPage() {
     }
   }, [fetchDedicated])
 
+  const fetchPlans = useCallback(async () => {
+    if (!allowed) return
+    const requestId = ++fetchPlansRef.current
+    setPlansLoading(true)
+    setPlansError("")
+    try {
+      const resp = await api.get<PlansPayload>("/panel/haioflash/plans/")
+      if (fetchPlansRef.current !== requestId) return
+      setPlansData(resp.data.results)
+      setPlansRegions(resp.data.regions)
+    } catch (error) {
+      if (fetchPlansRef.current === requestId) setPlansError(extractError(error))
+    } finally {
+      if (fetchPlansRef.current === requestId) setPlansLoading(false)
+    }
+  }, [allowed])
+
+  const openCreatePlan = useCallback(() => {
+    setPlanEditing(null)
+    setPlanForm(emptyPlanForm(plansRegions))
+    setPlanFormOpen(true)
+    setPlansError("")
+  }, [plansRegions])
+
+  const openEditPlan = useCallback((plan: AdminPlan) => {
+    setPlanEditing(plan)
+    setPlanForm(planToForm(plan, plansRegions))
+    setPlanFormOpen(true)
+    setPlansError("")
+  }, [plansRegions])
+
+  const updatePlanForm = useCallback((patch: Partial<PlanFormState>) => {
+    setPlanForm((current) => ({ ...current, ...patch }))
+  }, [])
+
+  const updatePlanRegion = useCallback((regionId: string, patch: Partial<PlanFormRegion>) => {
+    setPlanForm((current) => ({
+      ...current,
+      regions: current.regions.map((region) =>
+        region.region_id === regionId ? { ...region, ...patch } : region,
+      ),
+    }))
+  }, [])
+
+  const savePlan = useCallback(async () => {
+    const name = planForm.name.trim()
+    const slug = planForm.slug.trim()
+    if (!name || !slug) {
+      setPlansError("نام و slug پلن الزامی است.")
+      return
+    }
+    const requiredNumbers = [
+      planForm.vcpus,
+      planForm.memory_mib,
+      planForm.storage_gib,
+      planForm.traffic_gb,
+      planForm.price_per_month,
+    ]
+    if (requiredNumbers.some((value) => value.trim() === "" || Number.isNaN(Number(value)))) {
+      setPlansError("مقادیر عددی پلن را کامل و درست وارد کنید.")
+      return
+    }
+
+    const payload = {
+      name,
+      slug,
+      description: planForm.description.trim(),
+      plan_type: planForm.plan_type,
+      vcpus: Number(planForm.vcpus),
+      memory_mib: Number(planForm.memory_mib),
+      storage_gib: Number(planForm.storage_gib),
+      traffic_gb: Number(planForm.traffic_gb),
+      bandwidth_ingress_mbps: planForm.bandwidth_ingress_mbps.trim()
+        ? Number(planForm.bandwidth_ingress_mbps)
+        : null,
+      bandwidth_egress_mbps: planForm.bandwidth_egress_mbps.trim()
+        ? Number(planForm.bandwidth_egress_mbps)
+        : null,
+      price_per_month: Number(planForm.price_per_month),
+      price_hourly: planForm.price_hourly.trim() ? Number(planForm.price_hourly) : null,
+      hourly_enabled: planForm.hourly_enabled,
+      max_vms_per_org: planForm.max_vms_per_org.trim() ? Number(planForm.max_vms_per_org) : null,
+      sort_order: Number(planForm.sort_order || 0),
+      is_active: planForm.is_active,
+      regions: planForm.regions.map((region) => ({
+        region_id: region.region_id,
+        is_available: region.is_available,
+        price_override: region.price_override.trim() ? Number(region.price_override) : null,
+      })),
+    }
+
+    setPlanSaving(true)
+    setPlansError("")
+    try {
+      if (planEditing) {
+        await api.patch(`/panel/haioflash/plans/${planEditing.id}/`, payload)
+      } else {
+        await api.post("/panel/haioflash/plans/", payload)
+      }
+      setPlanFormOpen(false)
+      setPlanEditing(null)
+      await fetchPlans()
+    } catch (error) {
+      setPlansError(extractError(error))
+    } finally {
+      setPlanSaving(false)
+    }
+  }, [planForm, planEditing, fetchPlans])
+
+  const togglePlan = useCallback(async (plan: AdminPlan) => {
+    setPlansError("")
+    try {
+      await api.patch(`/panel/haioflash/plans/${plan.id}/`, { is_active: !plan.is_active })
+      await fetchPlans()
+    } catch (error) {
+      setPlansError(extractError(error))
+    }
+  }, [fetchPlans])
+
   const fetchHistory = useCallback(async () => {
     if (!allowed || !histAddress) return
     const requestId = ++fetchHistRef.current
@@ -746,6 +1027,11 @@ export default function HaioflashPage() {
     void fetchDedicated()
   }, [tab, fetchDedicated])
 
+  useEffect(() => {
+    if (tab !== "plans") return
+    void fetchPlans()
+  }, [tab, fetchPlans])
+
   if (authLoading) {
     return (
       <div className="flex h-64 items-center justify-center text-slate-400">
@@ -773,7 +1059,7 @@ export default function HaioflashPage() {
           <h1 className="text-xl font-semibold text-slate-800">هایوفلش</h1>
           <p className="mt-1 text-sm text-slate-500">
             کل سرورهای ابری کاربران — شماره ماشین، مالک، آی‌پی، اطلاعات ورود، تاریخ ساخت و انقضا، مصرف ترافیک و پلن.
-            زیرتب «موجودی آی‌پی» کل ۱۲۸ آی‌پی شاتل تهران را وضعیت‌به‌وضعیت نشان می‌دهد، زیرتب «سوابق آی‌پی» تاریخچهٔ مالکیت هر آی‌پی و زیرتب «سرور اختصاصی» آی‌پی‌های رزروشدهٔ سرورهای اختصاصی.
+            زیرتب «پلن‌ها» تعریف پلن، قیمت هر منطقه و فعال/غیرفعال کردن آن را نشان می‌دهد، زیرتب «موجودی آی‌پی» کل ۱۲۸ آی‌پی شاتل تهران را وضعیت‌به‌وضعیت نشان می‌دهد، زیرتب «سوابق آی‌پی» تاریخچهٔ مالکیت هر آی‌پی و زیرتب «سرور اختصاصی» آی‌پی‌های رزروشدهٔ سرورهای اختصاصی.
           </p>
           {vmData ? (
             <p className="mt-1 text-xs text-slate-400">آخرین بروزرسانی: {formatDateTime(vmData.generated_at)}</p>
@@ -784,18 +1070,20 @@ export default function HaioflashPage() {
           onClick={() =>
             tab === "vms"
               ? fetchVms()
-              : tab === "ips"
-                ? fetchIps()
-                : tab === "dedicated"
-                  ? fetchDedicated()
-                  : fetchHistory()
+              : tab === "plans"
+                ? fetchPlans()
+                : tab === "ips"
+                  ? fetchIps()
+                  : tab === "dedicated"
+                    ? fetchDedicated()
+                    : fetchHistory()
           }
-          disabled={vmLoading || ipLoading || dedLoading || histLoading}
+          disabled={vmLoading || plansLoading || ipLoading || dedLoading || histLoading}
         >
           <RefreshCw
             className={cn(
               "size-4",
-              (tab === "vms" ? vmLoading : tab === "ips" ? ipLoading : tab === "dedicated" ? dedLoading : histLoading) &&
+              (tab === "vms" ? vmLoading : tab === "plans" ? plansLoading : tab === "ips" ? ipLoading : tab === "dedicated" ? dedLoading : histLoading) &&
                 "animate-spin",
             )}
           />
@@ -814,6 +1102,16 @@ export default function HaioflashPage() {
           )}
         >
           سرورها
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("plans")}
+          className={cn(
+            "rounded-lg px-4 py-1.5 text-sm font-medium transition",
+            tab === "plans" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50",
+          )}
+        >
+          پلن‌ها
         </button>
         <button
           type="button"
@@ -1007,6 +1305,372 @@ export default function HaioflashPage() {
               </Button>
             </div>
           </div>
+        </section>
+      ) : tab === "plans" ? (
+        <section className="space-y-4">
+          <p className="text-xs text-slate-500">
+            تعریف پلن‌های هایوفلش، قیمت هر منطقه و فعال/غیرفعال کردن پلن. پلن غیرفعال در پنل مشتری دیده نمی‌شود.
+          </p>
+
+          {plansError ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{plansError}</div>
+          ) : null}
+
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="grid flex-1 gap-3 sm:grid-cols-3">
+              <MetaCard title="کل پلن‌ها" value={formatNumber((plansData ?? []).length)} note="فعال و غیرفعال" />
+              <MetaCard
+                title="فعال"
+                value={formatNumber((plansData ?? []).filter((plan) => plan.is_active).length)}
+                note="قابل خرید برای مشتری"
+                highlight
+              />
+              <MetaCard
+                title="غیرفعال"
+                value={formatNumber((plansData ?? []).filter((plan) => !plan.is_active).length)}
+                note="پنهان از پنل مشتری"
+              />
+            </div>
+            <Button onClick={openCreatePlan} disabled={!plansRegions.length || plansLoading}>
+              تعریف پلن جدید
+            </Button>
+          </div>
+
+          {planFormOpen ? (
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-slate-800">
+                  {planEditing ? `ویرایش ${planEditing.name}` : "تعریف پلن جدید"}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setPlanFormOpen(false)
+                    setPlanEditing(null)
+                  }}
+                >
+                  بستن
+                </Button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <label className="text-xs text-slate-600">
+                  نام پلن
+                  <Input
+                    className="mt-1"
+                    value={planForm.name}
+                    onChange={(event) => updatePlanForm({ name: event.target.value })}
+                    placeholder="Flash Lite"
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  slug (انگلیسی)
+                  <Input
+                    dir="ltr"
+                    className="mt-1 font-mono text-left"
+                    value={planForm.slug}
+                    onChange={(event) => updatePlanForm({ slug: event.target.value })}
+                    placeholder="flash-lite"
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  نوع پلن
+                  <select
+                    value={planForm.plan_type}
+                    onChange={(event) => updatePlanForm({ plan_type: event.target.value })}
+                    className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                  >
+                    {PLAN_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-slate-600">
+                  vCPU
+                  <Input
+                    type="number"
+                    min={1}
+                    className="mt-1"
+                    value={planForm.vcpus}
+                    onChange={(event) => updatePlanForm({ vcpus: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  RAM (MiB) <span className="text-slate-400">— ۱۰۲۴ = ۱ گیگ</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="mt-1"
+                    value={planForm.memory_mib}
+                    onChange={(event) => updatePlanForm({ memory_mib: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  دیسک (GiB)
+                  <Input
+                    type="number"
+                    min={0}
+                    className="mt-1"
+                    value={planForm.storage_gib}
+                    onChange={(event) => updatePlanForm({ storage_gib: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  ترافیک ماهانه (GB) <span className="text-slate-400">— ۱۰۲۴ = ۱ ترابایت</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    className="mt-1"
+                    value={planForm.traffic_gb}
+                    onChange={(event) => updatePlanForm({ traffic_gb: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  پهنای باند دانلود (Mbps)
+                  <Input
+                    type="number"
+                    min={0}
+                    className="mt-1"
+                    value={planForm.bandwidth_ingress_mbps}
+                    onChange={(event) => updatePlanForm({ bandwidth_ingress_mbps: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  پهنای باند آپلود (Mbps)
+                  <Input
+                    type="number"
+                    min={0}
+                    className="mt-1"
+                    value={planForm.bandwidth_egress_mbps}
+                    onChange={(event) => updatePlanForm({ bandwidth_egress_mbps: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  قیمت ماهانه (تومان)
+                  <Input
+                    type="number"
+                    min={0}
+                    className="mt-1"
+                    value={planForm.price_per_month}
+                    onChange={(event) => updatePlanForm({ price_per_month: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  قیمت ساعتی (تومان) — اختیاری
+                  <Input
+                    type="number"
+                    min={0}
+                    className="mt-1"
+                    value={planForm.price_hourly}
+                    onChange={(event) => updatePlanForm({ price_hourly: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  حداکثر سرور هر سازمان — اختیاری
+                  <Input
+                    type="number"
+                    min={1}
+                    className="mt-1"
+                    value={planForm.max_vms_per_org}
+                    onChange={(event) => updatePlanForm({ max_vms_per_org: event.target.value })}
+                  />
+                </label>
+                <label className="text-xs text-slate-600">
+                  ترتیب نمایش
+                  <Input
+                    type="number"
+                    className="mt-1"
+                    value={planForm.sort_order}
+                    onChange={(event) => updatePlanForm({ sort_order: event.target.value })}
+                  />
+                </label>
+                <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-slate-300"
+                    checked={planForm.is_active}
+                    onChange={(event) => updatePlanForm({ is_active: event.target.checked })}
+                  />
+                  پلن فعال باشد
+                </label>
+                <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-slate-300"
+                    checked={planForm.hourly_enabled}
+                    onChange={(event) => updatePlanForm({ hourly_enabled: event.target.checked })}
+                  />
+                  پرداخت ساعتی فعال باشد
+                </label>
+              </div>
+
+              <label className="mt-3 block text-xs text-slate-600">
+                توضیح
+                <textarea
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  value={planForm.description}
+                  onChange={(event) => updatePlanForm({ description: event.target.value })}
+                  placeholder="توضیح کوتاه برای پنل مشتری"
+                />
+              </label>
+
+              <div className="mt-4">
+                <p className="text-sm font-medium text-slate-700">قیمت و موجودی هر منطقه</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  اگر قیمت منطقه خالی بماند، قیمت پایهٔ پلن استفاده می‌شود. برای تهران معمولاً قیمت منطقه را وارد کنید.
+                </p>
+                <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="w-full min-w-[560px] text-right text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                        <th className="px-4 py-3 font-medium">منطقه</th>
+                        <th className="px-4 py-3 font-medium">فعال در این منطقه</th>
+                        <th className="px-4 py-3 font-medium">قیمت اختصاصی (تومان)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {planForm.regions.map((region) => (
+                        <tr key={region.region_id} className="border-b border-slate-100 last:border-0">
+                          <td className="px-4 py-2">
+                            <p className="text-slate-700">{region.region_name}</p>
+                            <p className="font-mono text-[11px] text-slate-400" dir="ltr">
+                              {region.region_slug}
+                            </p>
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="checkbox"
+                              className="size-4 rounded border-slate-300"
+                              checked={region.is_available}
+                              onChange={(event) =>
+                                updatePlanRegion(region.region_id, { is_available: event.target.checked })
+                              }
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={region.price_override}
+                              onChange={(event) =>
+                                updatePlanRegion(region.region_id, { price_override: event.target.value })
+                              }
+                              placeholder="خالی = قیمت پایه"
+                              className="h-9"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2">
+                <Button onClick={() => void savePlan()} disabled={planSaving}>
+                  {planSaving ? <Loader2 className="size-4 animate-spin" /> : null}
+                  ذخیره پلن
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPlanFormOpen(false)
+                    setPlanEditing(null)
+                  }}
+                >
+                  انصراف
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {plansLoading && !plansData ? (
+            <div className="flex h-40 items-center justify-center text-slate-400">
+              <Loader2 className="size-6 animate-spin" />
+            </div>
+          ) : (plansData?.length ?? 0) === 0 ? (
+            <p className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-400">
+              هنوز پلنی تعریف نشده است.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <table className="w-full min-w-[1100px] text-right text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                    <th className="px-4 py-3 font-medium">پلن</th>
+                    <th className="px-4 py-3 font-medium">منابع</th>
+                    <th className="px-4 py-3 font-medium">ترافیک</th>
+                    <th className="px-4 py-3 font-medium">پهنای باند</th>
+                    <th className="px-4 py-3 font-medium">قیمت پایه</th>
+                    <th className="px-4 py-3 font-medium">قیمت تهران</th>
+                    <th className="px-4 py-3 font-medium">وضعیت</th>
+                    <th className="px-4 py-3 font-medium">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plansData?.map((plan) => {
+                    const tehran = plan.regions.find((region) => region.region_slug === "teh-dc1") ?? plan.regions[0]
+                    const regionPrice = tehran?.price_override ?? plan.price_per_month
+                    return (
+                      <tr key={plan.id} className="border-b border-slate-100 align-top last:border-0">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-800">{plan.name}</p>
+                          <p className="font-mono text-[11px] text-slate-400" dir="ltr">
+                            {plan.slug}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {PLAN_TYPE_OPTIONS.find((option) => option.value === plan.plan_type)?.label ??
+                              plan.plan_type_display}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          <p>
+                            {formatNumber(plan.vcpus)} vCPU · {planMemory(plan.memory_mib)}
+                          </p>
+                          <p className="text-[11px] text-slate-400">{formatNumber(plan.storage_gib)} GB SSD</p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{formatBytes(plan.traffic_bytes)}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600" dir="ltr">
+                          {plan.bandwidth_ingress_mbps ?? "—"} / {plan.bandwidth_egress_mbps ?? "—"} Mbps
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{planPrice(plan.price_per_month)}</td>
+                        <td className="px-4 py-3 text-xs font-medium text-slate-700">{planPrice(regionPrice)}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={cn(
+                              "inline-block rounded-full px-2 py-0.5 text-[11px] font-medium",
+                              plan.is_active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500",
+                            )}
+                          >
+                            {plan.is_active ? "فعال" : "غیرفعال"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Button size="sm" variant="outline" onClick={() => openEditPlan(plan)}>
+                              ویرایش
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={plan.is_active ? "ghost" : "primary"}
+                              onClick={() => void togglePlan(plan)}
+                            >
+                              {plan.is_active ? "غیرفعال" : "فعال"}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       ) : tab === "ips" ? (
         <section className="space-y-4">
