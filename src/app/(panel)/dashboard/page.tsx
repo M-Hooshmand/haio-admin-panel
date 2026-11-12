@@ -181,6 +181,18 @@ interface CampaignRow {
   end_date: string | null
   active_days: number
   sent: number
+  sent_total: number
+  opens: number
+  unique_opens: number
+  clicks: number
+  unique_clicks: number
+  unsub: number
+  unique_unsub: number
+  open_rate: number
+  unique_open_rate: number
+  click_rate: number
+  unique_click_rate: number
+  unsub_rate: number
   conversions: number
   signups: number
   paid_count: number
@@ -317,6 +329,17 @@ export default function DashboardPage() {
     () => (data?.campaigns ?? []).filter((campaign) => campaign.sent > 0),
     [data]
   )
+
+  const campaignEngagement = useMemo(() => {
+    return activeCampaigns.reduce(
+      (acc, campaign) => ({
+        uniqueOpens: acc.uniqueOpens + (campaign.unique_opens ?? 0),
+        uniqueClicks: acc.uniqueClicks + (campaign.unique_clicks ?? 0),
+        uniqueUnsub: acc.uniqueUnsub + (campaign.unique_unsub ?? 0),
+      }),
+      { uniqueOpens: 0, uniqueClicks: 0, uniqueUnsub: 0 }
+    )
+  }, [activeCampaigns])
 
   const bands: ChartBand[] = useMemo(() => {
     if (!data) return []
@@ -564,7 +587,7 @@ export default function DashboardPage() {
             <KpiCard
               title="کمپین‌های بازه"
               value={faNum(activeCampaigns.length)}
-              hint={`${faNum(data.campaign_days.length)} روز ارسال · ${faNum(data.kpis.campaigns)} کمپین ثبت‌شده`}
+              hint={`${faNum(data.campaign_days.length)} روز ارسال · ${faNum(campaignEngagement.uniqueOpens)} باز‌شدن یکتا · ${faNum(campaignEngagement.uniqueClicks)} کلیک یکتا`}
               icon={Megaphone}
               tone="text-fuchsia-600"
             />
@@ -1076,12 +1099,12 @@ export default function DashboardPage() {
           {/* Campaign comparison */}
           <ChartCard
             title="کمپین‌ها و اثرشان"
-            subtitle="همه اعداد فقط مربوط به گیرندگان همان کمپین است (تطبیق با موبایل/کاربر)، بعد از اولین ارسال. «خرید محصول (پرداخت‌شده)» = تعداد فاکتورهای پرداخت‌شده‌ی همان محصول توسط گیرندگان؛ «فاکتور پرداختی» = همه فاکتورهای پرداخت‌شده‌ی گیرندگان (هر محصول) و «درآمد» = مبلغ همان‌ها. اعداد کل پلتفرم اینجا نمی‌آید."
+            subtitle="همه اعداد فقط مربوط به گیرندگان همان کمپین است (تطبیق با موبایل/کاربر)، بعد از اولین ارسال. «خرید محصول (پرداخت‌شده)» = تعداد فاکتورهای پرداخت‌شده‌ی همان محصول توسط گیرندگان؛ «فاکتور پرداختی» = همه فاکتورهای پرداخت‌شده‌ی گیرندگان (هر محصول) و «درآمد» = مبلغ همان‌ها. اعداد کل پلتفرم اینجا نمی‌آید. آمار باز شدن/کلیک/لغو از رویدادهای ایمیل و بر مبنای کل ارسال موفق کمپین است، نه فقط همین بازه."
             icon={Megaphone}
           >
             {activeCampaigns.length ? (
               <div className="max-h-[460px] overflow-auto rounded-xl border border-slate-100">
-                <table className="w-full min-w-[820px] text-right text-xs">
+                <table className="w-full min-w-[1180px] text-right text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 text-[11px] text-slate-500">
                       <th className="py-2 font-medium">کمپین</th>
@@ -1089,6 +1112,10 @@ export default function DashboardPage() {
                       <th className="py-2 font-medium">کانال</th>
                       <th className="py-2 font-medium">روزهای ارسال</th>
                       <th className="py-2 font-medium">ارسال</th>
+                      <th className="py-2 font-medium">باز شد (یکتا)</th>
+                      <th className="py-2 font-medium">نرخ باز شدن</th>
+                      <th className="py-2 font-medium">کلیک (یکتا)</th>
+                      <th className="py-2 font-medium">لغو اشتراک</th>
                       <th className="py-2 font-medium">ثبت‌نام</th>
                       <th className="py-2 font-medium">خرید محصول (پرداخت‌شده)</th>
                       <th className="py-2 font-medium">فاکتور پرداختی</th>
@@ -1121,6 +1148,30 @@ export default function DashboardPage() {
                           )}
                         </td>
                         <td className="py-2.5 text-slate-700">{faNum(campaign.sent)}</td>
+                        <td className="py-2.5 font-medium text-sky-700">
+                          {faNum(campaign.unique_opens)}
+                          <span className="mr-1 text-[10px] font-normal text-slate-400">
+                            از {faNum(campaign.opens)} بار
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-slate-600">
+                          {campaign.unique_open_rate}٪
+                          <span className="mr-1 text-[10px] text-slate-400">
+                            ({campaign.open_rate}٪ کل)
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-blue-700">
+                          {faNum(campaign.unique_clicks)}
+                          <span className="mr-1 text-[10px] text-slate-400">
+                            ({campaign.unique_click_rate}٪)
+                          </span>
+                        </td>
+                        <td className={campaign.unique_unsub ? "py-2.5 text-amber-600" : "py-2.5 text-slate-400"}>
+                          {faNum(campaign.unique_unsub)}
+                          <span className="mr-1 text-[10px] text-slate-400">
+                            ({campaign.unsub_rate}٪)
+                          </span>
+                        </td>
                         <td className="py-2.5 font-bold text-indigo-600">{faNum(campaign.signups)}</td>
                         <td className="py-2.5 text-slate-700">
                           {campaign.purchases === null ? "—" : faNum(campaign.purchases)}

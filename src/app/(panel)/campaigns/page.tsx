@@ -15,8 +15,10 @@ import {
   FlaskConical,
   Lightbulb,
   Loader2,
+  MailOpen,
   Megaphone,
   MessageSquareText,
+  MousePointerClick,
   Pause,
   Play,
   Plus,
@@ -72,6 +74,17 @@ interface CampaignRow {
   failed: number
   queued: number
   success_rate: number
+  opens: number
+  unique_opens: number
+  clicks: number
+  unique_clicks: number
+  unsub: number
+  unique_unsub: number
+  open_rate: number
+  unique_open_rate: number
+  click_rate: number
+  unique_click_rate: number
+  unsub_rate: number
   first_sent_at: string | null
   last_sent_at: string | null
   subject: string
@@ -164,6 +177,17 @@ interface Summary {
   failed: number
   queued: number
   success_rate: number
+  opens: number
+  unique_opens: number
+  clicks: number
+  unique_clicks: number
+  unsub: number
+  unique_unsub: number
+  open_rate: number
+  unique_open_rate: number
+  click_rate: number
+  unique_click_rate: number
+  unsub_rate: number
   active_audience: number
   feedback_total: number
   last_sent_at: string | null
@@ -395,9 +419,9 @@ export default function CampaignsPage() {
           <Megaphone className="h-4 w-4 text-indigo-600" />
           <span>
             {summary
-              ? `${formatNumber(summary.campaigns)} کمپین بله · ${formatNumber(
+              ? `${formatNumber(summary.campaigns)} کمپین · ${formatNumber(
                   summary.sent,
-                )} پیام موفق`
+                )} پیام موفق · ${formatNumber(summary.unique_opens)} باز‌شدن یکتا`
               : "در حال دریافت نتایج کمپین‌ها…"}
           </span>
           {summary && summary.queued > 0 ? (
@@ -452,9 +476,9 @@ export default function CampaignsPage() {
       ) : null}
 
       {/* summary cards */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
-          title="کمپین‌های بله"
+          title="کمپین‌ها"
           value={summary ? formatNumber(summary.campaigns) : "—"}
           hint={`آخرین ارسال: ${formatDateTime(summary?.last_sent_at)}`}
           icon={Megaphone}
@@ -473,6 +497,35 @@ export default function CampaignsPage() {
           hint={summary?.failed ? "قابل پیگیری با تلاش مجدد" : "بدون خطای ثبت‌شده"}
           icon={AlertTriangle}
           tone="text-rose-600 bg-rose-50"
+        />
+        <SummaryCard
+          title="ایمیل باز‌شده (یکتا)"
+          value={summary ? formatNumber(summary.unique_opens) : "—"}
+          hint={
+            summary
+              ? `نرخ یکتا ${summary.unique_open_rate}% · ${formatNumber(summary.opens)} بار باز شدن`
+              : "از رویدادهای ایمیل"
+          }
+          icon={MailOpen}
+          tone="text-sky-600 bg-sky-50"
+        />
+        <SummaryCard
+          title="کلیک ایمیل (یکتا)"
+          value={summary ? formatNumber(summary.unique_clicks) : "—"}
+          hint={
+            summary
+              ? `نرخ یکتا ${summary.unique_click_rate}% · ${formatNumber(summary.clicks)} کلیک`
+              : "از رویدادهای ایمیل"
+          }
+          icon={MousePointerClick}
+          tone="text-blue-600 bg-blue-50"
+        />
+        <SummaryCard
+          title="لغو اشتراک (یکتا)"
+          value={summary ? formatNumber(summary.unique_unsub) : "—"}
+          hint={`نرخ ${summary ? summary.unsub_rate : 0}% از ارسال‌ها`}
+          icon={ThumbsDown}
+          tone="text-amber-600 bg-amber-50"
         />
         <SummaryCard
           title="مخاطب فعال"
@@ -537,10 +590,11 @@ export default function CampaignsPage() {
           <div>
             <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
               <BarChart3 className="h-4 w-4 text-indigo-600" />
-              نتیجه کمپین‌های ارسال‌شده در بله
+              نتیجه کمپین‌ها — ارسال، باز شدن و کلیک
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              آمار از روی رکوردهای واقعی ارسال (CampaignSend) محاسبه می‌شود؛ نه شمارنده‌های قدیمی.
+              آمار تحویل از رکوردهای واقعی ارسال (CampaignSend) و آمار باز شدن/کلیک/لغو از
+              رویدادهای ایمیل (EmailEvent) محاسبه می‌شود؛ نرخ‌ها بر مبنای کل ارسال موفق کمپین است.
             </p>
           </div>
           <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-[11px] text-slate-500">
@@ -549,13 +603,17 @@ export default function CampaignsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-right text-sm">
+          <table className="w-full min-w-[1240px] text-right text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">کمپین / محصول</th>
                 <th className="px-4 py-3 font-medium">ارسال موفق</th>
                 <th className="px-4 py-3 font-medium">ناموفق</th>
                 <th className="px-4 py-3 font-medium">در صف</th>
+                <th className="px-4 py-3 font-medium">باز شد (یکتا)</th>
+                <th className="px-4 py-3 font-medium">نرخ باز شدن</th>
+                <th className="px-4 py-3 font-medium">کلیک (یکتا)</th>
+                <th className="px-4 py-3 font-medium">لغو اشتراک</th>
                 <th className="px-4 py-3 font-medium">نرخ موفقیت</th>
                 <th className="px-4 py-3 font-medium">بازخورد</th>
                 <th className="px-4 py-3 font-medium">آخرین ارسال</th>
@@ -565,7 +623,7 @@ export default function CampaignsPage() {
             <tbody className="divide-y divide-slate-100">
               {loading && rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-slate-400">
+                  <td colSpan={12} className="px-4 py-16 text-center text-slate-400">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     در حال دریافت نتایج کمپین‌ها…
                   </td>
@@ -574,7 +632,7 @@ export default function CampaignsPage() {
 
               {!loading && rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-slate-400">
+                  <td colSpan={12} className="px-4 py-16 text-center text-slate-400">
                     کمپینی با این فیلترها پیدا نشد.
                   </td>
                 </tr>
@@ -596,6 +654,9 @@ export default function CampaignsPage() {
                       ) : null}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">
+                        {row.channel === "email" ? "ایمیل" : row.channel === "bale" ? "بله" : row.channel}
+                      </span>
                       <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-600">
                         {row.product_label}
                       </span>
@@ -621,6 +682,42 @@ export default function CampaignsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-600">{formatNumber(row.queued)}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-bold text-sky-700">{formatNumber(row.unique_opens)}</span>
+                    <span className="mr-1 text-[11px] text-slate-400">
+                      از {formatNumber(row.opens)} بار
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div dir="ltr" className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-sky-500"
+                          style={{ width: `${Math.min(100, row.unique_open_rate)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium text-slate-600">{row.unique_open_rate}%</span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-400">{row.open_rate}% کل باز شدن‌ها</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="font-bold text-blue-700">{formatNumber(row.unique_clicks)}</span>
+                    <span className="mr-1 text-[11px] text-slate-400">
+                      از {formatNumber(row.clicks)} کلیک
+                    </span>
+                    <p className="mt-1 text-[10px] text-slate-400">نرخ یکتا {row.unique_click_rate}%</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        "font-bold",
+                        row.unique_unsub ? "text-amber-600" : "text-slate-400",
+                      )}
+                    >
+                      {formatNumber(row.unique_unsub)}
+                    </span>
+                    <p className="mt-1 text-[10px] text-slate-400">{row.unsub_rate}%</p>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div dir="ltr" className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
@@ -1049,6 +1146,26 @@ function CampaignDrawer({
                 <MiniStat label="ناموفق" value={formatNumber(campaign.failed)} tone="text-rose-600" />
                 <MiniStat label="در صف" value={formatNumber(campaign.queued)} tone="text-amber-600" />
                 <MiniStat label="نرخ موفقیت" value={`${campaign.success_rate}%`} tone="text-indigo-600" />
+                <MiniStat
+                  label="باز شدن (یکتا)"
+                  value={`${formatNumber(campaign.unique_opens)} / ${formatNumber(campaign.opens)}`}
+                  tone="text-sky-700"
+                />
+                <MiniStat
+                  label="نرخ باز شدن (یکتا)"
+                  value={`${campaign.unique_open_rate}%`}
+                  tone="text-sky-600"
+                />
+                <MiniStat
+                  label="کلیک (یکتا)"
+                  value={`${formatNumber(campaign.unique_clicks)} / ${formatNumber(campaign.clicks)}`}
+                  tone="text-blue-700"
+                />
+                <MiniStat
+                  label="لغو اشتراک"
+                  value={`${formatNumber(campaign.unique_unsub)} · ${campaign.unsub_rate}%`}
+                  tone="text-amber-600"
+                />
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-4">
