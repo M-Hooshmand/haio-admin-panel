@@ -55,3 +55,89 @@ body {
   background: #cbd5e1;
   border-radius: 999px;
 }
+
+/* Live infrastructure brain */
+@keyframes brain-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes brain-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes brain-core-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes brain-ring {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+
+@keyframes brain-node-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.brain-spin-slow,
+.brain-spin-reverse,
+.brain-core-pulse,
+.brain-ring,
+.brain-node-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.brain-spin-slow {
+  animation: brain-spin 34s linear infinite;
+}
+
+.brain-spin-reverse {
+  animation: brain-spin-reverse 26s linear infinite;
+}
+
+.brain-core-pulse {
+  animation: brain-core-pulse 5.5s ease-in-out infinite;
+}
+
+.brain-ring {
+  animation: brain-ring 4.5s ease-out infinite;
+}
+
+.brain-node-pulse {
+  animation: brain-node-pulse 3.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-spin-slow,
+  .brain-spin-reverse,
+  .brain-core-pulse,
+  .brain-ring,
+  .brain-node-pulse {
+    animation: none;
+  }
+}

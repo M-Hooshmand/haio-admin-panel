@@ -150,6 +150,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "TECHNICAL"],
   },
   {
+    key: "brain",
+    href: "/brain",
+    title: "مغز زیرساخت",
+    description: "نمای زندهٔ شبکهٔ عصبی محصولات و ورکرها",
+    roles: ["MANAGER", "TECHNICAL"],
+  },
+  {
     key: "assistant",
     href: "/assistant",
     title: "دستیار هوشمند",
