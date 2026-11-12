@@ -143,6 +143,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "TECHNICAL"],
   },
   {
+    key: "notifications",
+    href: "/notifications",
+    title: "گزارش اعلان‌ها",
+    description: "تاریخچه ارسال ایمیل و پیامک برای همه محصولات",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+  },
+  {
     key: "assistant",
     href: "/assistant",
     title: "دستیار هوشمند",

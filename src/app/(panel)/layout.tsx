@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Activity,
   BarChart3,
+  Bell,
   Building2,
   Cpu,
   CreditCard,
@@ -44,6 +45,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   tickets: Ticket,
   campaigns: Megaphone,
   monitoring: Activity,
+  notifications: Bell,
   assistant: Sparkles,
   reports: BarChart3,
   settings: Settings,
