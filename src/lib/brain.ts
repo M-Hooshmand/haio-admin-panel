@@ -370,6 +370,15 @@ const SECTION_PRODUCT: Record<string, ProductKey> = {
   marketplace: "paas",
   slides: "paas",
   functions: "paas",
+  cdn: "hosting",
+  dns: "hosting",
+  waf: "hosting",
+  ssl: "hosting",
+  wordpress: "hosting",
+  android: "devices",
+  "android-cloud": "devices",
+  desktop: "devices",
+  desktops: "devices",
   brain: "platform",
 }
 
@@ -403,6 +412,15 @@ export const SECTION_LABELS: Record<string, string> = {
   support: "پشتیبانی",
   invitations: "دعوت‌نامه‌ها",
   functions: "فانکشن‌ها",
+  cdn: "CDN و میزبانی",
+  dns: "DNS",
+  waf: "فایروال",
+  ssl: "گواهی SSL",
+  wordpress: "وردپرس",
+  android: "اندروید ابری",
+  "android-cloud": "اندروید ابری",
+  desktop: "دسکتاپ ابری",
+  desktops: "دسکتاپ ابری",
 }
 
 export function productForSection(section: string | null | undefined): ProductKey {
