@@ -34,6 +34,7 @@ import { NAV_ITEMS, PANEL_ROLE_LABELS, navItemsForUser } from "@/lib/roles"
 import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { CloudzyStatusWidget } from "@/components/cloudzy-status"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
@@ -219,6 +220,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="flex items-center gap-2">
+            <CloudzyStatusWidget />
             <span className="hidden rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 sm:inline">
               {PANEL_ROLE_LABELS[role]}
             </span>
