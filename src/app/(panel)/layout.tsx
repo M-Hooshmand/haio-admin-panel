@@ -18,9 +18,11 @@ import {
   Menu,
   ReceiptText,
   FileText,
+  Globe,
   Server,
   Settings,
   ShieldAlert,
+  Smartphone,
   Sparkles,
   ShieldCheck,
   Ticket,
@@ -50,6 +52,8 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   brain: BrainCircuit,
   assistant: Sparkles,
   reports: BarChart3,
+  wordpress_report: Globe,
+  android_cloud_report: Smartphone,
   settings: Settings,
 }
 

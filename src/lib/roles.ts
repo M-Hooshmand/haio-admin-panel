@@ -150,6 +150,20 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "TECHNICAL"],
   },
   {
+    key: "wordpress_report",
+    href: "/wordpress-report",
+    title: "گزارش هاست مدیریت‌شده",
+    description: "خرید، وضعیت و دامنهٔ هاست‌های وردپرس + مدیریت پلن‌ها",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+  },
+  {
+    key: "android_cloud_report",
+    href: "/android-cloud-report",
+    title: "گزارش سرویس ابری اندروید",
+    description: "دستگاه‌های ابری اندروید، دوره و پلن‌ها",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+  },
+  {
     key: "brain",
     href: "/brain",
     title: "مغز زیرساخت",
