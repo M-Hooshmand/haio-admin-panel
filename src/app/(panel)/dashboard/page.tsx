@@ -279,7 +279,7 @@ function tomanCompact(value: number): string {
 
 export default function DashboardPage() {
   const { user, role } = useAuthStore()
-  const [days, setDays] = useState(90)
+  const [days, setDays] = useState(1)
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
