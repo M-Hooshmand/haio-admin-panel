@@ -834,7 +834,7 @@ export default function CDNPage() {
                   <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-[11px]">
                     <div>
                       <p className="text-slate-400">کش موفق</p>
-                      <p className="font-bold text-slate-700">{faBytes(summary.traffic.cache_hits * 1024)}</p>
+                      <p className="font-bold text-slate-700">{faNum(summary.traffic.cache_hits)}</p>
                     </div>
                     <div>
                       <p className="text-slate-400">نسبت کش</p>
