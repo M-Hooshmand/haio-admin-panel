@@ -45,6 +45,7 @@ interface Kpis {
   gateway_inflow_amount: number
   wallet_inflow_amount: number
   manual_inflow_amount?: number
+  inflow_yesterday?: number
   open_tickets: number
   logins_today: number
   users_today: number
@@ -241,8 +242,17 @@ interface DashboardData {
   campaign_days: string[]
 }
 
-const RANGES = [1, 7, 14, 30, 90, 180]
-const RANGE_LABELS: Record<number, string> = { 1: "روزانه", 7: "۷ روز", 14: "۱۴ روز", 30: "۳۰ روز", 90: "۹۰ روز", 180: "۱۸۰ روز" }
+// (days, offset): offset=1 with days=1 is "yesterday only", so staff can
+// compare yesterday's inflow against today without changing anything else.
+const RANGES: { days: number; offset: number; label: string }[] = [
+  { days: 1, offset: 0, label: "روزانه" },
+  { days: 1, offset: 1, label: "دیروز" },
+  { days: 7, offset: 0, label: "۷ روز" },
+  { days: 14, offset: 0, label: "۱۴ روز" },
+  { days: 30, offset: 0, label: "۳۰ روز" },
+  { days: 90, offset: 0, label: "۹۰ روز" },
+  { days: 180, offset: 0, label: "۱۸۰ روز" },
+]
 const CHANNEL_LABELS: Record<string, string> = {
   email: "ایمیل",
   bale: "بله",
@@ -280,6 +290,7 @@ function tomanCompact(value: number): string {
 export default function DashboardPage() {
   const { user, role } = useAuthStore()
   const [days, setDays] = useState(1)
+  const [offset, setOffset] = useState(0)
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -292,7 +303,7 @@ export default function DashboardPage() {
       setError(null)
       try {
         const { data: payload } = await api.get<DashboardData>("/panel/dashboard/", {
-          params: { days },
+          params: { days, offset },
         })
         setData(payload)
       } catch (err) {
@@ -302,7 +313,7 @@ export default function DashboardPage() {
         if (!silent) setLoading(false)
       }
     },
-    [days]
+    [days, offset]
   )
 
   useEffect(() => {
@@ -458,6 +469,16 @@ export default function DashboardPage() {
       }))
   }, [data])
 
+  // Yesterday-vs-today delta for the inflow card. Only meaningful for the
+  // 1-day views; when the user picks «دیروز» the previous day is «روز قبل».
+  const inflowDelta = useMemo(() => {
+    const current = data?.kpis.inflow_amount ?? 0
+    const previous = data?.kpis.inflow_yesterday ?? 0
+    if (!previous) return null
+    const pct = Math.round(((current - previous) / previous) * 1000) / 10
+    return { previous, pct }
+  }, [data])
+
   const displayName =
     user?.display_name ||
     [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
@@ -473,7 +494,7 @@ export default function DashboardPage() {
             <p className="text-xs text-indigo-100">داشبورد مدیریت</p>
             <h2 className="mt-1 text-xl font-bold md:text-2xl">{displayName}</h2>
             <p className="mt-2 text-xs leading-6 text-indigo-100">
-              تصویر کامل {days === 1 ? "امروز" : `${faNum(days)} روز گذشته`} از ثبت‌نام، احراز هویت، محصولات،
+              تصویر کامل {days === 1 ? (offset === 1 ? "دیروز" : "امروز") : `${faNum(days)} روز گذشته`} از ثبت‌نام، احراز هویت، محصولات،
               فاکتورها، تیکت‌ها، کمپین‌ها و ورود کاربران به پنل. آمار فقط شامل
               مشتریان واقعی است و حساب‌های ادمین/پشتیبانی جدا شده‌اند.
               {role ? ` دسترسی شما: ${PANEL_ROLE_LABELS[role]}.` : ""}
@@ -483,14 +504,19 @@ export default function DashboardPage() {
             <div className="flex rounded-xl bg-white/10 p-1">
               {RANGES.map((range) => (
                 <button
-                  key={range}
-                  onClick={() => setDays(range)}
+                  key={`${range.days}-${range.offset}`}
+                  onClick={() => {
+                    setDays(range.days)
+                    setOffset(range.offset)
+                  }}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-medium transition",
-                    days === range ? "bg-white text-indigo-700" : "text-indigo-100 hover:bg-white/10"
+                    days === range.days && offset === range.offset
+                      ? "bg-white text-indigo-700"
+                      : "text-indigo-100 hover:bg-white/10"
                   )}
                 >
-                  {RANGE_LABELS[range] ?? `${faNum(range)} روز`}
+                  {range.label}
                 </button>
               ))}
             </div>
@@ -530,7 +556,13 @@ export default function DashboardPage() {
           {/* KPIs */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
-              title={days === 1 ? "ثبت‌نام امروز" : `ثبت‌نام ${faNum(days)} روز`}
+              title={
+                days === 1
+                  ? offset === 1
+                    ? "ثبت‌نام دیروز"
+                    : "ثبت‌نام امروز"
+                  : `ثبت‌نام ${faNum(days)} روز`
+              }
               value={faNum(data.kpis.signups)}
               hint={`${faNum(data.kpis.verified)} احراز هویت · نرخ ${faNum(data.kpis.verification_rate)}٪`}
               icon={UserPlus}
@@ -544,6 +576,12 @@ export default function DashboardPage() {
               )}${
                 (data.kpis.manual_inflow_amount ?? 0) > 0
                   ? ` · کارت‌به‌کارت: ${tomanCompact(data.kpis.manual_inflow_amount ?? 0)}`
+                  : ""
+              }${
+                days === 1 && inflowDelta
+                  ? ` · ${offset === 1 ? "روز قبل" : "دیروز"}: ${tomanCompact(
+                      inflowDelta.previous
+                    )} (${inflowDelta.pct >= 0 ? "+" : ""}${faNum(inflowDelta.pct)}٪)`
                   : ""
               }`}
               icon={CircleDollarSign}
