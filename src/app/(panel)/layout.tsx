@@ -10,6 +10,7 @@ import {
   BrainCircuit,
   Building2,
   Cpu,
+  CloudCog,
   CreditCard,
   LayoutDashboard,
   Loader2,
@@ -38,6 +39,7 @@ import { CloudzyStatusWidget } from "@/components/cloudzy-status"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
+  cdn: CloudCog,
   users: Users,
   organizations: Building2,
   subscriptions: CreditCard,

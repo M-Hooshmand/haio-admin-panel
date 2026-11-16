@@ -80,6 +80,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
   },
   {
+    key: "cdn",
+    href: "/cdn",
+    title: "CDN",
+    description: "اشتراک‌ها، دامنه‌ها، درآمد، ترافیک، پلن‌ها و نودهای CDN",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+  },
+  {
     key: "users",
     href: "/users",
     title: "کاربران",
