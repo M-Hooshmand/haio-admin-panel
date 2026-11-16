@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Activity,
+  ArrowLeft,
   BadgeCheck,
   CircleDollarSign,
   CircleDashed,
+  Globe2,
   Megaphone,
   ReceiptText,
   RefreshCw,
@@ -390,6 +392,10 @@ export default function DashboardPage() {
       ? data?.revenue_by_product ?? []
       : data?.revenue_by_product_monthly.find((row) => row.month === activeMonth)?.products ?? []
 
+  const cdnRevenue = data?.revenue_by_product.find((row) => row.key === "cdn")
+  const cdnService = data?.services.find((row) => row.key === "cdn")
+  const cdnProducts = data?.products.find((row) => row.key === "cdn")
+
   const dailyProductSeries = useMemo(() => {
     const rows = data?.revenue_by_product_daily ?? []
     if (!rows.length) return []
@@ -652,6 +658,74 @@ export default function DashboardPage() {
             />
           </div>
 
+          {/* CDN product highlight */}
+          <section className="rounded-2xl border border-pink-200 bg-gradient-to-l from-pink-50 via-white to-white p-4 md:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <span className="rounded-lg bg-pink-100 p-1.5 text-pink-600">
+                  <Globe2 className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">CDN</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    درآمد و سرویس‌های محصول CDN در بازه انتخاب‌شده
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/cdn"
+                className="flex items-center gap-1 rounded-lg border border-pink-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-pink-700 transition-colors hover:bg-pink-50"
+              >
+                مشاهده تب CDN
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </a>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
+                <p className="text-[10px] text-slate-400">درآمد بازه</p>
+                <p className="mt-1 text-lg font-bold text-pink-600">
+                  {tomanCompact(cdnRevenue?.amount ?? 0)}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {faNum(cdnRevenue?.count ?? 0)} فاکتور پرداخت‌شده
+                </p>
+              </div>
+              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
+                <p className="text-[10px] text-slate-400">سرویس فعال</p>
+                <p className="mt-1 text-lg font-bold text-slate-800">
+                  {faNum(cdnService?.active ?? 0)}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  از {faNum(cdnService?.total ?? 0)} اشتراک
+                </p>
+              </div>
+              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
+                <p className="text-[10px] text-slate-400">محصول جدید در بازه</p>
+                <p className="mt-1 text-lg font-bold text-slate-800">
+                  {faNum(cdnProducts?.daily.reduce((sum, row) => sum + row.count, 0) ?? 0)}
+                </p>
+                <p className="text-[10px] text-slate-400">اشتراک تازه</p>
+              </div>
+              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
+                <p className="text-[10px] text-slate-400">سهم از درآمد محصولات</p>
+                <p className="mt-1 text-lg font-bold text-slate-800">
+                  {faNum(
+                    Math.round(
+                      ((cdnRevenue?.amount ?? 0) /
+                        Math.max(
+                          1,
+                          data.revenue_by_product.reduce((sum, row) => sum + row.amount, 0)
+                        )) *
+                        100
+                    )
+                  )}
+                  ٪
+                </p>
+                <p className="text-[10px] text-slate-400">در بازه انتخاب‌شده</p>
+              </div>
+            </div>
+          </section>
+
           {/* Inflow by fixed period */}
           <ChartCard
             title="ورودی مالی در بازه‌های مختلف"
@@ -665,7 +739,11 @@ export default function DashboardPage() {
                   className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
                 >
                   <div className="text-xs font-medium text-slate-500">
-                    {period.days === 1 ? `امروز (${faDay(data.range.to)})` : period.label}
+                    {period.key === "1d"
+                      ? offset === 0
+                        ? `امروز (${faDay(data.range.to)})`
+                        : "امروز"
+                      : period.label}
                   </div>
                   <div className="mt-1 text-lg font-bold text-slate-800">
                     {tomanCompact(period.amount)}
