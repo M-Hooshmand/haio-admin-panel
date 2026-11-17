@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  Bot,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -57,6 +58,8 @@ interface TicketComment {
 interface TicketDetail extends TicketRow {
   body: string
   agent_name?: string | null
+  agent_model?: string | null
+  agent_model_name?: string | null
   satisfied?: boolean | null
   comments: TicketComment[]
 }
@@ -81,6 +84,27 @@ interface Page<T> {
   next: string | null
   previous: string | null
   results: T[]
+}
+
+interface AgentModelOption {
+  id: string
+  value: string
+  name: string
+  featured: boolean
+  limited_regions: boolean
+}
+
+interface AgentModelSettings {
+  model: string
+  model_name: string
+  fallback_model: string
+  fallback_model_name: string
+  last_model_used?: string
+  last_model_used_name?: string
+  last_used_at?: string | null
+  models: AgentModelOption[]
+  updated_at?: string | null
+  updated_by_name?: string | null
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -137,6 +161,12 @@ export default function TicketsPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
+  const [agentModel, setAgentModel] = useState<AgentModelSettings | null>(null)
+  const [modelDraft, setModelDraft] = useState("")
+  const [fallbackDraft, setFallbackDraft] = useState("")
+  const [savingModel, setSavingModel] = useState(false)
+  const [modelNotice, setModelNotice] = useState("")
+
   const pageSize = 20
 
   useEffect(() => {
@@ -155,6 +185,36 @@ export default function TicketsPage() {
       /* meta is optional chrome — the queue still works */
     }
   }, [])
+
+  const fetchAgentModel = useCallback(async () => {
+    try {
+      const { data } = await api.get<AgentModelSettings>("/panel/tickets/agent-model/")
+      setAgentModel(data)
+      setModelDraft(data.model)
+      setFallbackDraft(data.fallback_model)
+    } catch {
+      /* the selector is optional chrome — the queue still works */
+    }
+  }, [])
+
+  const saveAgentModel = async () => {
+    setSavingModel(true)
+    setModelNotice("")
+    try {
+      const { data } = await api.patch<AgentModelSettings>("/panel/tickets/agent-model/", {
+        model: modelDraft,
+        fallback_model: fallbackDraft,
+      })
+      setAgentModel(data)
+      setModelDraft(data.model)
+      setFallbackDraft(data.fallback_model)
+      setModelNotice("مدل پاسخ‌دهنده ذخیره شد؛ از تیکت بعدی اعمال می‌شود.")
+    } catch (err) {
+      setModelNotice(extractError(err))
+    } finally {
+      setSavingModel(false)
+    }
+  }
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
@@ -180,12 +240,17 @@ export default function TicketsPage() {
   }, [fetchMeta])
 
   useEffect(() => {
+    fetchAgentModel()
+  }, [fetchAgentModel])
+
+  useEffect(() => {
     fetchRows()
   }, [fetchRows])
 
   const refreshAll = () => {
     fetchRows()
     fetchMeta()
+    fetchAgentModel()
   }
 
   const pages = Math.max(1, Math.ceil(count / pageSize))
@@ -218,6 +283,88 @@ export default function TicketsPage() {
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
           بروزرسانی
         </Button>
+      </div>
+
+      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-l from-indigo-50/70 to-white p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-100 text-indigo-600">
+              <Bot className="h-4 w-4" />
+            </span>
+            <div>
+              <div className="text-[11px] text-slate-500">مدل پاسخ‌دهنده تیکت‌ها</div>
+              <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-800">
+                <span>{agentModel?.model_name ?? "در حال دریافت…"}</span>
+                {agentModel?.last_model_used_name ? (
+                  <span className="rounded-md bg-white/70 px-1.5 py-0.5 text-[10px] font-normal text-slate-500">
+                    آخرین پاسخ: {agentModel.last_model_used_name}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {agentModel ? (
+            <div className="ms-auto flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                اصلی
+                <select
+                  value={modelDraft}
+                  onChange={(event) => setModelDraft(event.target.value)}
+                  className="h-9 max-w-[230px] rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
+                >
+                  {agentModel.models.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.featured ? "★ " : ""}
+                      {option.name}
+                      {option.limited_regions ? " (محدود)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                جایگزین
+                <select
+                  value={fallbackDraft}
+                  onChange={(event) => setFallbackDraft(event.target.value)}
+                  className="h-9 max-w-[210px] rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
+                >
+                  {agentModel.models.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.featured ? "★ " : ""}
+                      {option.name}
+                      {option.limited_regions ? " (محدود)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button
+                size="sm"
+                onClick={saveAgentModel}
+                disabled={
+                  savingModel ||
+                  !agentModel ||
+                  (modelDraft === agentModel.model && fallbackDraft === agentModel.fallback_model)
+                }
+              >
+                {savingModel ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                ذخیره
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        {modelNotice ? <div className="mt-2 text-[11px] text-indigo-700">{modelNotice}</div> : null}
+        {agentModel?.updated_at ? (
+          <div className="mt-1 text-[10px] text-slate-400">
+            آخرین تغییر: {formatTime(agentModel.updated_at)}
+            {agentModel.updated_by_name ? ` · ${agentModel.updated_by_name}` : ""}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-3">
@@ -550,6 +697,11 @@ function TicketDrawer({
                 ) : null}
                 {ticket.product_name ? (
                   <span className="rounded-lg bg-indigo-50 px-2 py-0.5 text-indigo-600">{ticket.product_name}</span>
+                ) : null}
+                {ticket.agent_model_name ? (
+                  <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                    مدل پاسخ: {ticket.agent_model_name}
+                  </span>
                 ) : null}
               </div>
             ) : null}
