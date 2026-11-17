@@ -206,6 +206,13 @@ interface IpPage {
   results: FlashIp[]
 }
 
+function dedicatedGroupKey(name: string): string {
+  const clean = (name || "").trim()
+  const match = clean.match(/(سرور اختصاصی \S+)/)
+  if (match) return match[1]
+  return clean || "بدون نام"
+}
+
 interface DedicatedRow {
   id: string
   address: string
@@ -870,6 +877,22 @@ export default function HaioflashPage() {
       setDedError(extractError(error))
     }
   }, [fetchDedicated])
+
+  const dedGroups = useMemo(() => {
+    const groups = new Map<string, DedicatedRow[]>()
+    for (const row of dedData ?? []) {
+      const key = dedicatedGroupKey(row.server_name)
+      const list = groups.get(key)
+      if (list) list.push(row)
+      else groups.set(key, [row])
+    }
+    return Array.from(groups.entries())
+      .map(([key, rows]) => [
+        key,
+        [...rows].sort((a, b) => a.address.localeCompare(b.address)),
+      ] as [string, DedicatedRow[]])
+      .sort((a, b) => a[0].localeCompare(b[0], "fa"))
+  }, [dedData])
 
   const fetchPlans = useCallback(async () => {
     if (!allowed) return
@@ -1885,71 +1908,98 @@ export default function HaioflashPage() {
               هنوز آی‌پی‌ای برای سرور اختصاصی ثبت نشده است.
             </p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {dedData?.map((row) => (
-                <div key={row.id} className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-mono text-sm font-medium text-slate-800" dir="ltr">{row.address}</p>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        row.is_active ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500",
-                      )}
-                    >
-                      {row.is_active ? "فعال" : "غیرفعال"}
-                    </span>
-                  </div>
-                  {dedRowEditing?.id === row.id ? (
-                    <div className="mt-2 space-y-2">
-                      <Input
-                        value={dedRowEditing.server_name}
-                        onChange={(event) =>
-                          setDedRowEditing({ ...dedRowEditing, server_name: event.target.value })
-                        }
-                        placeholder="نام سرور"
-                      />
-                      <Input
-                        value={dedRowEditing.note}
-                        onChange={(event) => setDedRowEditing({ ...dedRowEditing, note: event.target.value })}
-                        placeholder="توضیح"
-                      />
+            <div className="space-y-3">
+              {dedGroups.map(([groupName, rows]) => {
+                const activeCount = rows.filter((row) => row.is_active).length
+                return (
+                  <div key={groupName} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            void updateDedicated(row, {
-                              server_name: dedRowEditing.server_name,
-                              note: dedRowEditing.note,
-                            })
-                            setDedRowEditing(null)
-                          }}
-                        >
-                          ذخیره
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setDedRowEditing(null)}>
-                          انصراف
-                        </Button>
+                        <Server className="size-4 text-indigo-600" />
+                        <p className="text-sm font-semibold text-slate-800">{groupName}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px]">
+                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700">
+                          {rows.length} آی‌پی
+                        </span>
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                          {activeCount} فعال
+                        </span>
                       </div>
                     </div>
-                  ) : (
-                    <>
-                      <p className="mt-2 font-semibold text-indigo-700">
-                        {row.server_name || "بدون نام"}
-                      </p>
-                      {row.note ? <p className="mt-0.5 text-[11px] text-slate-500">{row.note}</p> : null}
-                      <p className="mt-1 text-[10px] text-slate-400">ثبت: {formatDate(row.created_at)}</p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setDedRowEditing(row)}>
-                          ویرایش
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => void deleteDedicated(row)}>
-                          حذف
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                    <div className="divide-y divide-slate-100">
+                      {rows.map((row) => (
+                        <div key={row.id} className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-mono text-sm font-medium text-slate-800" dir="ltr">{row.address}</p>
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                row.is_active ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500",
+                              )}
+                            >
+                              {row.is_active ? "فعال" : "غیرفعال"}
+                            </span>
+                            {row.server_name.includes("نود") ? (
+                              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                آی‌پی خودِ نود
+                              </span>
+                            ) : null}
+                          </div>
+                          {dedRowEditing?.id === row.id ? (
+                            <div className="mt-2 space-y-2">
+                              <Input
+                                value={dedRowEditing.server_name}
+                                onChange={(event) =>
+                                  setDedRowEditing({ ...dedRowEditing, server_name: event.target.value })
+                                }
+                                placeholder="نام سرور"
+                              />
+                              <Input
+                                value={dedRowEditing.note}
+                                onChange={(event) => setDedRowEditing({ ...dedRowEditing, note: event.target.value })}
+                                placeholder="توضیح"
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    void updateDedicated(row, {
+                                      server_name: dedRowEditing.server_name,
+                                      note: dedRowEditing.note,
+                                    })
+                                    setDedRowEditing(null)
+                                  }}
+                                >
+                                  ذخیره
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => setDedRowEditing(null)}>
+                                  انصراف
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              {row.note ? <p className="mt-1 text-[11px] text-slate-500">{row.note}</p> : null}
+                              <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[10px] text-slate-400">ثبت: {formatDate(row.created_at)}</p>
+                                <div className="flex items-center gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => setDedRowEditing(row)}>
+                                    ویرایش
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => void deleteDedicated(row)}>
+                                    حذف
+                                  </Button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>
