@@ -74,7 +74,7 @@ export interface DetailField {
 
 export interface ProductReportConfig {
   /** Key inside `/staff/products/report-meta/`. */
-  product: "wordpress" | "android_cloud"
+  product: "wordpress" | "android_cloud" | "desktop"
   title: string
   subtitle: string
   icon: ComponentType<{ className?: string }>
@@ -89,6 +89,8 @@ export interface ProductReportConfig {
   planFields: PlanField[]
   planDefaults: Record<string, string | number | boolean>
   planNote: string
+  /** Show a free-trial / paid filter, badge and column (Cloud Desktop, WordPress). */
+  trialFilter?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +137,7 @@ interface Summary {
   canceled: number
   live: number
   trial?: number
+  paid?: number
   revenue_current_period: number
   revenue_monthly_equivalent: number
   by_status: { key: string; label: string; count: number }[]
@@ -283,6 +286,27 @@ function buildPlanPayload(fields: PlanField[], values: FormValues): Record<strin
   return payload
 }
 
+/** Which serializer field carries "how many customers bought this plan". */
+function planUsageKey(product: ProductReportConfig["product"]): string {
+  if (product === "wordpress") return "sites_count"
+  if (product === "desktop") return "desktops_count"
+  return "devices_count"
+}
+
+function planUsageLabel(product: ProductReportConfig["product"]): string {
+  if (product === "wordpress") return "سایت‌ها"
+  if (product === "desktop") return "دسکتاپ‌ها"
+  return "دستگاه‌ها"
+}
+
+/** Whether an active plan is actually on sale in the public catalog. */
+function planVisible(product: ProductReportConfig["product"], plan: PlanRecord): boolean {
+  if (!plan.is_active) return false
+  if (plan.is_trial) return false
+  if (product === "wordpress" && plan.is_multi_site) return false
+  return true
+}
+
 // ---------------------------------------------------------------------------
 // page
 // ---------------------------------------------------------------------------
@@ -309,6 +333,7 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
   const [statusFilter, setStatusFilter] = useState("")
   const [cycle, setCycle] = useState("")
   const [organization, setOrganization] = useState("")
+  const [purchaseType, setPurchaseType] = useState("")
   const [dateFrom, setDateFrom] = useState<string | null>(null)
   const [dateTo, setDateTo] = useState<string | null>(null)
 
@@ -330,10 +355,21 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
     if (statusFilter) params.status = statusFilter
     if (cycle) params.billing_cycle = cycle
     if (organization) params.organization = organization
+    if (config.trialFilter && purchaseType) params.is_trial = purchaseType
     if (dateFrom) params.date_from = dateFrom
     if (dateTo) params.date_to = dateTo
     return params
-  }, [search, plan, statusFilter, cycle, organization, dateFrom, dateTo])
+  }, [
+    search,
+    plan,
+    statusFilter,
+    cycle,
+    organization,
+    purchaseType,
+    config.trialFilter,
+    dateFrom,
+    dateTo,
+  ])
 
   const fetchRows = useCallback(async () => {
     const current = ++requestId.current
@@ -390,7 +426,8 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const hasDateRange = Boolean(dateFrom || dateTo)
   const activeFilterCount =
-    [plan, statusFilter, cycle, organization].filter(Boolean).length + (hasDateRange ? 1 : 0)
+    [plan, statusFilter, cycle, organization, purchaseType].filter(Boolean).length +
+    (hasDateRange ? 1 : 0)
 
   const resetFilters = () => {
     setSearchInput("")
@@ -398,6 +435,7 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
     setStatusFilter("")
     setCycle("")
     setOrganization("")
+    setPurchaseType("")
     setDateFrom(null)
     setDateTo(null)
     setPage(1)
@@ -410,6 +448,7 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
   }
 
   const Icon = config.icon
+  const columnCount = config.trialFilter ? 9 : 8
 
   return (
     <div className="space-y-4">
@@ -491,11 +530,23 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
               نسخهٔ آزمایشی: <b className="text-slate-800">{formatNumber(summary.trial)}</b>
             </span>
           ) : null}
+          {typeof summary.paid === "number" ? (
+            <span>
+              پلن پولی: <b className="text-slate-800">{formatNumber(summary.paid)}</b>
+            </span>
+          ) : null}
         </div>
       ) : null}
 
       <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
-        <div className="grid gap-2 lg:grid-cols-[1fr_170px_170px_150px_200px]">
+        <div
+          className={cn(
+            "grid gap-2",
+            config.trialFilter
+              ? "lg:grid-cols-[1fr_160px_150px_130px_150px_190px]"
+              : "lg:grid-cols-[1fr_170px_170px_150px_200px]",
+          )}
+        >
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
@@ -551,6 +602,20 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
               </option>
             ))}
           </select>
+          {config.trialFilter ? (
+            <select
+              value={purchaseType}
+              onChange={(event) => {
+                setPurchaseType(event.target.value)
+                setPage(1)
+              }}
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
+            >
+              <option value="">رایگان و پولی</option>
+              <option value="false">فقط پولی</option>
+              <option value="true">فقط رایگان (آزمایشی)</option>
+            </select>
+          ) : null}
           <select
             value={organization}
             onChange={(event) => {
@@ -614,6 +679,7 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
                 <th className="px-4 py-3 font-medium">مشتری</th>
                 <th className="px-4 py-3 font-medium">سازمان</th>
                 <th className="px-4 py-3 font-medium">پلن</th>
+                {config.trialFilter ? <th className="px-4 py-3 font-medium">نوع خرید</th> : null}
                 <th className="px-4 py-3 font-medium">{config.identifier.label}</th>
                 <th className="px-4 py-3 font-medium">پایان دوره</th>
                 <th className="px-4 py-3 font-medium">مبلغ / دوره</th>
@@ -623,7 +689,7 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
             <tbody className="divide-y divide-slate-100">
               {loading && rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-slate-400">
+                  <td colSpan={columnCount} className="px-4 py-16 text-center text-slate-400">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     در حال دریافت گزارش…
                   </td>
@@ -632,7 +698,7 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
 
               {!loading && rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-slate-400">
+                  <td colSpan={columnCount} className="px-4 py-16 text-center text-slate-400">
                     هیچ {config.entityName}ی با این فیلترها پیدا نشد.
                   </td>
                 </tr>
@@ -672,6 +738,20 @@ export function ProductReportPage({ config }: { config: ProductReportConfig }) {
                         {row.plan_slug}
                       </p>
                     </td>
+                    {config.trialFilter ? (
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                            row.is_trial
+                              ? "border-violet-200 bg-violet-50 text-violet-700"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                          )}
+                        >
+                          {row.is_trial ? "رایگان (آزمایشی)" : "پولی"}
+                        </span>
+                      </td>
+                    ) : null}
                     <td
                       className="max-w-[210px] truncate px-4 py-3 text-xs text-slate-600"
                       dir="ltr"
@@ -1035,9 +1115,7 @@ function PlansDialog({
                       <th className="px-3 py-2.5 font-medium">ماهانه</th>
                       <th className="px-3 py-2.5 font-medium">سالانه</th>
                       <th className="px-3 py-2.5 font-medium">وضعیت</th>
-                      <th className="px-3 py-2.5 font-medium">
-                        {config.product === "wordpress" ? "سایت‌ها" : "دستگاه‌ها"}
-                      </th>
+                      <th className="px-3 py-2.5 font-medium">{planUsageLabel(config.product)}</th>
                       <th className="px-5 py-2.5 font-medium">عملیات</th>
                     </tr>
                   </thead>
@@ -1058,10 +1136,8 @@ function PlansDialog({
                       </tr>
                     ) : null}
                     {plans.map((plan) => {
-                      const usage = plan[config.product === "wordpress" ? "sites_count" : "devices_count"]
-                      const visible = config.product === "wordpress"
-                        ? plan.is_active && !plan.is_multi_site && !plan.is_trial
-                        : plan.is_active
+                      const usage = plan[planUsageKey(config.product)]
+                      const visible = planVisible(config.product, plan)
                       return (
                         <tr key={plan.id} className={cn(!plan.is_active && "bg-slate-50/60")}>
                           <td className="px-5 py-2.5">

@@ -24,6 +24,7 @@ import {
   Settings,
   ShieldAlert,
   Smartphone,
+  Monitor,
   Sparkles,
   ShieldCheck,
   Ticket,
@@ -57,6 +58,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   reports: BarChart3,
   wordpress_report: Globe,
   android_cloud_report: Smartphone,
+  desktop_report: Monitor,
   settings: Settings,
 }
 

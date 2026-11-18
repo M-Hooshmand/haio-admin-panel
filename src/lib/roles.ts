@@ -171,6 +171,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
   },
   {
+    key: "desktop_report",
+    href: "/desktop-report",
+    title: "دسکتاپ مجازی",
+    description: "دسکتاپ‌های مجازی فروخته‌شده: مشتری، پلن رایگان یا پولی، دوره و وضعیت",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+  },
+  {
     key: "brain",
     href: "/brain",
     title: "مغز زیرساخت",
