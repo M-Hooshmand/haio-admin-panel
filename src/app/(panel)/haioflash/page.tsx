@@ -312,6 +312,8 @@ interface HistClaim {
   traffic_used_bytes: number
   created_at: string
   ended_at: string | null
+  /** When the row was written in this panel (import time for legacy rows). */
+  recorded_at?: string | null
   is_current: boolean
   is_dead: boolean
 }
@@ -2061,14 +2063,21 @@ export default function HaioflashPage() {
                       </p>
                       <p className="text-[11px] text-slate-400">{histData.current.node} · {histData.current.region}</p>
                       <p className="mt-1 text-[11px] text-slate-500">
-                        از تاریخ {formatDate(histData.current.created_at)}
-                        {histData.current.ended_at ? ` تا ${formatDate(histData.current.ended_at)}` : " تاکنون"}
+                        از {formatDateTime(histData.current.created_at)}
+                        {histData.current.ended_at ? ` تا ${formatDateTime(histData.current.ended_at)}` : " تاکنون"}
                       </p>
                     </div>
                   ) : (
                     <div className="rounded-xl border border-slate-200 bg-white p-4">
                       <p className="text-xs text-slate-500">مالک فعلی</p>
                       <p className="mt-1 text-sm text-slate-600">الان دست هیچ سروری نیست</p>
+                      {histData.claims.length > 0 ? (
+                        <p className="mt-1.5 text-[11px] text-slate-500">
+                          آخرین مالک: {ownerName(histData.claims[0].owner)} — سرور «{histData.claims[0].name}»
+                          <br />
+                          تا {formatDateTime(histData.claims[0].ended_at)}
+                        </p>
+                      ) : null}
                       {histData.pool ? (
                         <p className="mt-1 text-[11px] text-slate-400">
                           وضعیت استخر: {histData.pool.is_active ? "فعال" : "غیرفعال / قرنطینه"} · {histData.pool.state}
@@ -2096,8 +2105,8 @@ export default function HaioflashPage() {
                   <table className="min-w-[900px] w-full text-right text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
-                        <th className="px-4 py-3 font-medium">از تاریخ</th>
-                        <th className="px-4 py-3 font-medium">تا تاریخ</th>
+                        <th className="px-4 py-3 font-medium">از تاریخ و ساعت</th>
+                        <th className="px-4 py-3 font-medium">تا تاریخ و ساعت</th>
                         <th className="px-4 py-3 font-medium">برای چه کسی</th>
                         <th className="px-4 py-3 font-medium">سرور</th>
                         <th className="px-4 py-3 font-medium">وضعیت ردیف</th>
@@ -2117,8 +2126,8 @@ export default function HaioflashPage() {
                           const meta = VM_STATUS[claim.status]
                           return (
                             <tr key={claim.id} className={cn("border-b border-slate-100 align-top last:border-0", claim.is_current && "bg-emerald-50/40")}>
-                              <td className="px-4 py-3 text-xs text-slate-600">{formatDate(claim.created_at)}</td>
-                              <td className="px-4 py-3 text-xs text-slate-600">{claim.ended_at ? formatDate(claim.ended_at) : <span className="font-medium text-emerald-600">تاکنون</span>}</td>
+                              <td className="px-4 py-3 text-xs text-slate-600" dir="rtl">{formatDateTime(claim.created_at)}</td>
+                              <td className="px-4 py-3 text-xs text-slate-600" dir="rtl">{claim.ended_at ? formatDateTime(claim.ended_at) : <span className="font-medium text-emerald-600">تاکنون</span>}</td>
                               <td className="px-4 py-3">
                                 <p className="text-slate-800">{ownerName(claim.owner)}</p>
                                 <p className="text-[11px] text-slate-400">{claim.organization.name}</p>
