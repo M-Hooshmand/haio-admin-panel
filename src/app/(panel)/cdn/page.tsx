@@ -166,6 +166,253 @@ interface Node {
   updated_at: string
 }
 
+interface OpsNode {
+  id: number
+  name: string
+  ip: string
+  region: string
+  role: string
+  is_active: boolean
+  health_status: string
+  nginx_status: string
+  pdns_status: string
+  ns_hostname: string
+  ssh_port: number | null
+  weight: number
+  cache_mode: string
+  slug: string
+}
+
+interface OpsAgent {
+  id: number
+  name: string
+  ip: string
+  region: string
+  role: string
+  is_active: boolean
+  agent_status: string
+  reachable: boolean
+  version: string
+  agent_name: string
+  agent_region: string
+  agent_roles: string
+  hostname: string
+  checked_at: string
+}
+
+interface OpsFleet {
+  api: { ok: boolean; detail: string; base_url: string }
+  fleet: { total: number; active: number; healthy: number; regions: Record<string, number> }
+  lua: { zones: number; records: number; custom: number }
+  domains: { total: number; by_status: Record<string, number> }
+  degraded?: boolean
+  detail?: string
+}
+
+interface TrafficPoint {
+  date: string
+  requests_total: number
+  requests_cached: number
+  bytes_total: number
+  status_2xx: number
+  status_3xx: number
+  status_4xx: number
+  status_5xx: number
+  cache_hit_ratio: number
+  avg_bps: number
+}
+
+interface TrafficDomain {
+  id: string
+  django_id: string | null
+  name: string
+  cdn_type: string
+  cdn_type_label: string
+  status: string
+  ssl_status: string
+  requests_total: number
+  requests_cached: number
+  bytes_sent: number
+  bytes_received: number
+  bytes_total: number
+  status_2xx: number
+  status_3xx: number
+  status_4xx: number
+  status_5xx: number
+  cache_hit_ratio: number
+  avg_bps: number
+  days: number
+  first_date: string
+  last_date: string
+  daily: TrafficPoint[]
+  nodes: {
+    node_id: number
+    node_name: string
+    region: string
+    requests_total: number
+    requests_cached: number
+    bytes_total: number
+    status_4xx: number
+    status_5xx: number
+    cache_hit_ratio: number
+  }[]
+  organization_id: string
+  organization_name: string
+  organization_slug: string
+  plan_name: string
+  plan_slug: string
+  subscription_status: string
+  traffic_used_bytes: number
+  traffic_allowance_bytes: number
+  wordpress: boolean
+  origin_ip: string
+  is_legacy: boolean
+}
+
+interface FleetTraffic {
+  range: string
+  since: string
+  generated_at: string
+  degraded: boolean
+  detail: string
+  totals: {
+    domains: number
+    domains_with_traffic: number
+    requests_total: number
+    requests_cached: number
+    bytes_sent: number
+    bytes_received: number
+    bytes_cached: number
+    bytes_total: number
+    status_2xx: number
+    status_3xx: number
+    status_4xx: number
+    status_5xx: number
+    cache_hit_ratio: number
+    avg_bps: number
+    days: number
+    last_data_date: string
+  }
+  ingest: {
+    status: string
+    last_task_status: string
+    last_started_at: string | null
+    last_completed_at: string | null
+    rows_daily: number
+    rows_samples: number
+    last_date: string
+    last_sample_at: string | null
+  }
+  live: {
+    window_seconds: number
+    generated_at: string
+    totals: {
+      requests: number
+      bytes_out: number
+      bytes_in: number
+      bytes_total: number
+      cache_hits: number
+      cache_requests: number
+      cache_hit_ratio: number
+      status_2xx: number
+      status_3xx: number
+      status_4xx: number
+      status_5xx: number
+      req_per_sec: number
+      bytes_per_sec: number
+      avg_concurrency: number
+      connections: {
+        ok: boolean
+        active: number
+        reading: number
+        writing: number
+        waiting: number
+        accepts: number
+        handled: number
+        requests: number
+      }
+    }
+    nodes: { name: string; requests: number; bytes_total: number; error?: string }[]
+  } | null
+  nodes: { id: number; name: string; ip: string; region: string; role: string; is_active: boolean; health_status: string; last_check_at: string }[]
+  domains: TrafficDomain[]
+}
+
+interface DomainControls {
+  domain: Domain
+  subscription: Subscription | null
+  cache: {
+    cms_preset: string
+    bypass_uri_presets: string[]
+    bypass_uri_custom: string
+    bypass_cookie_presets: string[]
+    bypass_cookie_custom: string
+    cache_ttl_200: string
+    cache_ttl_301: string
+    cache_ttl_404: string
+    cache_inactive: string
+    stale_while_revalidate: boolean
+    stale_on_error: boolean
+    cache_query_string: string
+    origin_protocol: string
+    origin_host_header: string
+    force_https: boolean
+    hsts_enabled: boolean
+    hsts_max_age: number
+    proxy_connect_timeout: string
+    proxy_send_timeout: string
+    proxy_read_timeout: string
+    proxy_cache_lock: boolean
+    proxy_cache_revalidate: boolean
+    custom_nginx_snippet: string
+    config_version: number
+    last_deployed_at: string | null
+    ssl_enabled: boolean
+    available: boolean
+    is_admin_override: boolean
+  } | null
+  ssl: {
+    domain: string
+    ssl_status: string
+    ssl_type: string
+    ssl_expires_at: string | null
+    available: boolean
+    local_ssl_status: string
+    local_ssl_type: string
+    local_ssl_expires_at: string | null
+    certificate: {
+      auto_renew: boolean
+      common_name: string
+      created_at: string
+      deployed_nodes: string[]
+      expires_at: string
+      issued_at: string
+      san_names: string[]
+      type: string
+    } | null
+  } | null
+  waf: {
+    enabled: boolean
+    mode: string
+    profile: string
+    excluded_rule_ids: string[]
+    body_limit_kb: number
+    rate_limit_rpm: number
+    rate_limit_burst: number
+    upload_paths: string[]
+    never_ban: string[]
+    ai_confirm: boolean
+    fail_mode: string
+    zero_day: boolean
+    config_version: number
+    available: boolean
+    is_admin_override: boolean
+  } | null
+  dns_only: boolean
+}
+
+type TrafficRange = "24h" | "7d" | "30d"
+
 interface Summary {
   generated_at: string
   range: { days: number; start: string; end: string }
@@ -431,10 +678,18 @@ function UsageBar({ percent }: { percent: number | null }) {
 // page
 // ---------------------------------------------------------------------------
 
-type TabKey = "overview" | "subscriptions" | "domains" | "invoices" | "plans" | "nodes"
+type TabKey =
+  | "overview"
+  | "traffic"
+  | "subscriptions"
+  | "domains"
+  | "invoices"
+  | "plans"
+  | "nodes"
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "overview", label: "نمای کلی", icon: Activity },
+  { key: "traffic", label: "ترافیک", icon: Signal },
   { key: "subscriptions", label: "اشتراک‌ها", icon: Wallet },
   { key: "domains", label: "دامنه‌ها", icon: Globe2 },
   { key: "invoices", label: "فاکتورها", icon: ReceiptText },
@@ -469,6 +724,24 @@ export default function CDNPage() {
 
   const [plans, setPlans] = useState<SummaryPlan[]>([])
   const [nodes, setNodes] = useState<Node[]>([])
+
+  const [opsNodes, setOpsNodes] = useState<OpsNode[]>([])
+  const [opsAgents, setOpsAgents] = useState<{
+    agents: OpsAgent[]
+    expected_version: string
+    summary: { ok: number; outdated: number; offline: number; error: number; total: number }
+  } | null>(null)
+  const [opsFleet, setOpsFleet] = useState<OpsFleet | null>(null)
+  const [opsLoading, setOpsLoading] = useState(false)
+
+  const [trafficRange, setTrafficRange] = useState<TrafficRange>("24h")
+  const [trafficLive, setTrafficLive] = useState(false)
+  const [traffic, setTraffic] = useState<FleetTraffic | null>(null)
+  const [trafficLoading, setTrafficLoading] = useState(false)
+  const [trafficError, setTrafficError] = useState("")
+
+  const [domainControls, setDomainControls] = useState<DomainControls | null>(null)
+  const [domainControlsLoading, setDomainControlsLoading] = useState(false)
 
   const [detail, setDetail] = useState<SubscriptionDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -563,6 +836,80 @@ export default function CDNPage() {
     if (tab === "invoices") void loadInvoices()
   }, [tab, loadInvoices])
 
+  const loadOps = useCallback(async () => {
+    setOpsLoading(true)
+    try {
+      const [nodesRes, agentsRes, fleetRes] = await Promise.all([
+        api.get<{ nodes: OpsNode[] }>("/staff/cdn/ops/nodes/"),
+        api.get<{
+          agents: OpsAgent[]
+          expected_version: string
+          summary: { ok: number; outdated: number; offline: number; error: number; total: number }
+        }>("/staff/cdn/ops/agents/"),
+        api.get<OpsFleet>("/staff/cdn/ops/overview/"),
+      ])
+      setOpsNodes(nodesRes.data.nodes ?? [])
+      setOpsAgents(agentsRes.data)
+      setOpsFleet(fleetRes.data)
+      if (nodesRes.data.nodes?.length) {
+        setNodes((current) =>
+          current.length
+            ? current
+            : nodesRes.data.nodes.map((node) => ({
+                id: String(node.id),
+                name: node.name,
+                slug: node.slug,
+                external_node_id: node.id,
+                role: node.role,
+                role_display: node.role,
+                region: node.region,
+                ip: node.ip,
+                is_active: node.is_active,
+                health_status: node.health_status,
+                nginx_status: node.nginx_status,
+                pdns_status: node.pdns_status,
+                last_check_at: null,
+                created_at: "",
+                updated_at: "",
+              }))
+        )
+      }
+    } catch {
+      setOpsNodes([])
+      setOpsAgents(null)
+      setOpsFleet(null)
+    } finally {
+      setOpsLoading(false)
+    }
+  }, [])
+
+  const loadTraffic = useCallback(async () => {
+    setTrafficLoading(true)
+    setTrafficError("")
+    try {
+      const { data } = await api.get<FleetTraffic>("/staff/cdn/ops/traffic/", {
+        params: { range: trafficRange, live: trafficLive ? 1 : 0 },
+      })
+      setTraffic(data)
+    } catch (err) {
+      setTraffic(null)
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "دریافت ترافیک ناوگان CDN ناموفق بود."
+      setTrafficError(message)
+    } finally {
+      setTrafficLoading(false)
+    }
+  }, [trafficRange, trafficLive])
+
+  useEffect(() => {
+    if (tab === "traffic") void loadTraffic()
+  }, [tab, loadTraffic])
+
+  useEffect(() => {
+    if (tab === "nodes") void loadOps()
+  }, [tab, loadOps])
+
   useEffect(() => {
     if (tab === "plans" && !plans.length) {
       api
@@ -570,13 +917,7 @@ export default function CDNPage() {
         .then(({ data }) => setPlans(data.results))
         .catch(() => undefined)
     }
-    if (tab === "nodes" && !nodes.length) {
-      api
-        .get<{ results: Node[] }>("/staff/cdn/nodes/")
-        .then(({ data }) => setNodes(data.results))
-        .catch(() => undefined)
-    }
-  }, [tab, plans.length, nodes.length])
+  }, [tab, plans.length])
 
   const openSubscription = async (id: string) => {
     setDetailLoading(true)
@@ -596,14 +937,18 @@ export default function CDNPage() {
   const openDomain = async (id: string) => {
     setDomainDetailLoading(true)
     setDomainDetail(null)
-    try {
-      const { data } = await api.get<DomainDetail>(`/staff/cdn/domains/${id}/`)
-      setDomainDetail(data)
-    } catch {
-      setDomainDetail(null)
-    } finally {
-      setDomainDetailLoading(false)
-    }
+    setDomainControls(null)
+    setDomainControlsLoading(true)
+    const [detailResult, controlsResult] = await Promise.allSettled([
+      api.get<DomainDetail>(`/staff/cdn/domains/${id}/`),
+      api.get<DomainControls>(`/staff/cdn/ops/domains/${id}/controls/`),
+    ])
+    if (detailResult.status === "fulfilled") setDomainDetail(detailResult.value.data)
+    else setDomainDetail(null)
+    if (controlsResult.status === "fulfilled") setDomainControls(controlsResult.value.data)
+    else setDomainControls(null)
+    setDomainDetailLoading(false)
+    setDomainControlsLoading(false)
   }
 
   const revenueSeries = useMemo(() => {
@@ -660,6 +1005,38 @@ export default function CDNPage() {
       })),
     [summary]
   )
+
+  const trafficDomains = useMemo(
+    () => [...(traffic?.domains ?? [])].sort((a, b) => b.bytes_total - a.bytes_total),
+    [traffic]
+  )
+
+  const trafficNodeRows = useMemo(() => {
+    const byNode = new Map<
+      string,
+      { name: string; region: string; requests: number; bytes: number; cached: number; errors4xx: number; errors5xx: number }
+    >()
+    for (const domain of traffic?.domains ?? []) {
+      for (const node of domain.nodes ?? []) {
+        const current = byNode.get(node.node_name) ?? {
+          name: node.node_name,
+          region: node.region,
+          requests: 0,
+          bytes: 0,
+          cached: 0,
+          errors4xx: 0,
+          errors5xx: 0,
+        }
+        current.requests += node.requests_total || 0
+        current.bytes += node.bytes_total || 0
+        current.cached += node.requests_cached || 0
+        current.errors4xx += node.status_4xx || 0
+        current.errors5xx += node.status_5xx || 0
+        byNode.set(node.node_name, current)
+      }
+    }
+    return [...byNode.values()].sort((a, b) => b.bytes - a.bytes)
+  }, [traffic])
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4 lg:p-6" dir="rtl">
@@ -955,6 +1332,266 @@ export default function CDNPage() {
             </div>
           ) : null}
 
+          {tab === "traffic" ? (
+            <div className="space-y-4">
+              <Panel
+                title="ترافیک ناوگان CDN"
+                subtitle="درخواست‌ها، حجم عبوری، کش و خطاها از کنترل‌پلین و آینه روزانه پنل"
+                icon={Signal}
+                action={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex overflow-hidden rounded-lg border border-slate-200 bg-white text-[11px]">
+                      {(["24h", "7d", "30d"] as TrafficRange[]).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setTrafficRange(value)}
+                          className={cn(
+                            "px-2.5 py-1.5 font-medium transition",
+                            trafficRange === value
+                              ? "bg-indigo-600 text-white"
+                              : "text-slate-500 hover:bg-slate-50"
+                          )}
+                        >
+                          {value === "24h" ? "۲۴ ساعت" : value === "7d" ? "۷ روز" : "۳۰ روز"}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setTrafficLive((current) => !current)}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition",
+                        trafficLive
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                      )}
+                    >
+                      <Signal className={cn("h-3.5 w-3.5", trafficLive && "animate-pulse")} />
+                      ترافیک لحظه‌ای
+                    </button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadTraffic()}
+                      disabled={trafficLoading}
+                    >
+                      <RefreshCw className={cn("h-3.5 w-3.5", trafficLoading && "animate-spin")} />
+                      به‌روزرسانی
+                    </Button>
+                  </div>
+                }
+              >
+                {trafficError ? (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-700">
+                    {trafficError}
+                  </div>
+                ) : null}
+                {trafficLoading && !traffic ? (
+                  <div className="flex justify-center py-10">
+                    <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                  </div>
+                ) : traffic ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] text-slate-400">درخواست کل</p>
+                        <p className="mt-1 text-lg font-bold text-slate-800">
+                          {faNum(traffic.totals.requests_total)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {faNum(traffic.totals.requests_cached)} از کش
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] text-slate-400">حجم کل</p>
+                        <p className="mt-1 text-lg font-bold text-slate-800">
+                          {faBytes(traffic.totals.bytes_total)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          میانگین {faBytes(traffic.totals.avg_bps)} بر ثانیه
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] text-slate-400">نسبت کش</p>
+                        <p className="mt-1 text-lg font-bold text-slate-800">
+                          {faNum(Math.round((traffic.totals.cache_hit_ratio ?? 0) * 100))}٪
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {faNum(traffic.totals.days)} روز داده · آخرین {traffic.totals.last_data_date || "—"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-[11px] text-slate-400">دامنه دارای ترافیک</p>
+                        <p className="mt-1 text-lg font-bold text-slate-800">
+                          {faNum(traffic.totals.domains_with_traffic)} / {faNum(traffic.totals.domains)}
+                        </p>
+                        <p className="text-[10px] text-rose-500">
+                          {faNum(traffic.totals.status_4xx + traffic.totals.status_5xx)} خطای ۴xx/۵xx
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[11px]">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <Database className="h-3.5 w-3.5 text-slate-400" />
+                        ورود داده:
+                        <Badge status={traffic.ingest.status} label={traffic.ingest.status} />
+                      </span>
+                      <span className="text-slate-500">
+                        ردیف روزانه <b className="text-slate-700">{faNum(traffic.ingest.rows_daily ?? 0)}</b>
+                      </span>
+                      <span className="text-slate-500">
+                        نمونه <b className="text-slate-700">{faNum(traffic.ingest.rows_samples ?? 0)}</b>
+                      </span>
+                      <span className="text-slate-500">
+                        آخرین نمونه: <b className="text-slate-700">{traffic.ingest.last_sample_at ? formatJalali(traffic.ingest.last_sample_at) : "—"}</b>
+                      </span>
+                      {traffic.degraded ? (
+                        <span className="text-amber-600">کنترل‌پلین در دسترس نیست؛ داده از آینه پنل خوانده شد.</span>
+                      ) : null}
+                    </div>
+
+                    {trafficLive && traffic.live ? (
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <h4 className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+                            <Signal className="h-4 w-4" />
+                            ترافیک لحظه‌ای (پنجره {faNum(traffic.live.window_seconds ?? 0)} ثانیه)
+                          </h4>
+                          <span className="text-[10px] text-emerald-700/70">
+                            {formatJalali(traffic.live.generated_at)}
+                          </span>
+                        </div>
+                        <div className="grid gap-2 text-[11px] sm:grid-cols-2 lg:grid-cols-4">
+                          <div>
+                            <p className="text-emerald-700/60">درخواست</p>
+                            <p className="font-bold text-emerald-900">{faNum(traffic.live.totals?.requests ?? 0)}</p>
+                          </div>
+                          <div>
+                            <p className="text-emerald-700/60">حجم</p>
+                            <p className="font-bold text-emerald-900">{faBytes(traffic.live.totals?.bytes_total ?? 0)}</p>
+                          </div>
+                          <div>
+                            <p className="text-emerald-700/60">درخواست/ثانیه</p>
+                            <p className="font-bold text-emerald-900">{faNum(traffic.live.totals?.req_per_sec ?? 0)}</p>
+                          </div>
+                          <div>
+                            <p className="text-emerald-700/60">اتصال فعال</p>
+                            <p className="font-bold text-emerald-900">
+                              {faNum(traffic.live.totals?.connections?.active ?? 0)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <Empty text="داده ترافیکی در این بازه ثبت نشده است." />
+                )}
+              </Panel>
+
+              {traffic ? (
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <Panel
+                    className="xl:col-span-2"
+                    title="ترافیک به تفکیک دامنه"
+                    subtitle="مرتب‌شده بر اساس حجم عبوری؛ برای جزئیات روی دامنه کلیک کنید"
+                    icon={Globe2}
+                  >
+                    {trafficDomains.length ? (
+                      <div className="max-h-[460px] overflow-auto rounded-xl border border-slate-200">
+                        <table className="w-full text-right text-[11px]">
+                          <thead className="sticky top-0 z-10 bg-slate-50 text-slate-400">
+                            <tr>
+                              <th className="px-3 py-2 font-medium">دامنه</th>
+                              <th className="px-3 py-2 font-medium">مشتری / پلن</th>
+                              <th className="px-3 py-2 font-medium">درخواست</th>
+                              <th className="px-3 py-2 font-medium">کش</th>
+                              <th className="px-3 py-2 font-medium">حجم</th>
+                              <th className="px-3 py-2 font-medium">خطا</th>
+                              <th className="px-3 py-2 font-medium">آخرین داده</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {trafficDomains.map((row) => (
+                              <tr
+                                key={row.id}
+                                onClick={() => row.django_id && void openDomain(row.django_id)}
+                                className={cn(
+                                  "border-t border-slate-100",
+                                  row.django_id ? "cursor-pointer hover:bg-slate-50" : ""
+                                )}
+                              >
+                                <td className="px-3 py-2">
+                                  <p className="font-medium text-slate-700" dir="ltr">{row.name}</p>
+                                  <p className="text-[10px] text-slate-400">
+                                    {row.cdn_type_label} · {statusLabel(row.status)}
+                                    {row.wordpress ? " · وردپرس" : ""}
+                                  </p>
+                                </td>
+                                <td className="px-3 py-2 text-slate-600">
+                                  <p>{row.organization_name}</p>
+                                  <p className="text-[10px] text-slate-400">{row.plan_name || "—"}</p>
+                                </td>
+                                <td className="px-3 py-2 text-slate-600">{faNum(row.requests_total)}</td>
+                                <td className="px-3 py-2 text-slate-600">
+                                  {faNum(Math.round((row.cache_hit_ratio ?? 0) * 100))}٪
+                                </td>
+                                <td className="px-3 py-2 font-medium text-slate-700">{faBytes(row.bytes_total)}</td>
+                                <td className="px-3 py-2">
+                                  <span className={row.status_5xx ? "text-rose-600" : "text-slate-400"}>
+                                    {faNum(row.status_4xx)} / {faNum(row.status_5xx)}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-slate-500">{row.last_date || "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <Empty text="ترافیکی برای دامنه‌ها ثبت نشده است." />
+                    )}
+                  </Panel>
+
+                  <Panel title="ترافیک به تفکیک نود" subtitle="تجمیع درخواست‌ها و حجم هر نود لبه" icon={Server}>
+                    {trafficNodeRows.length ? (
+                      <div className="space-y-2">
+                        {trafficNodeRows.map((node) => (
+                          <div key={node.name} className="rounded-xl border border-slate-100 p-3 text-[11px]">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                                <Server className="h-3.5 w-3.5 text-slate-400" />
+                                {node.name}
+                              </span>
+                              <span className="text-[10px] text-slate-400">{node.region}</span>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-1 text-slate-500">
+                              <span>درخواست: <b className="text-slate-700">{faNum(node.requests)}</b></span>
+                              <span>حجم: <b className="text-slate-700">{faBytes(node.bytes)}</b></span>
+                              <span>
+                                کش: <b className="text-slate-700">
+                                  {faNum(node.requests ? Math.round((node.cached / node.requests) * 100) : 0)}٪
+                                </b>
+                              </span>
+                              <span className={node.errors5xx ? "text-rose-600" : ""}>
+                                خطا: <b>{faNum(node.errors4xx + node.errors5xx)}</b>
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <Empty text="ترافیک نودی ثبت نشده است." />
+                    )}
+                  </Panel>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {tab === "subscriptions" ? (
             <Panel
               title="اشتراک‌های CDN"
@@ -1080,6 +1717,7 @@ export default function CDNPage() {
                     <option value="pending_payment">در انتظار پرداخت</option>
                     <option value="error">خطا</option>
                     <option value="suspended">معلق</option>
+                    <option value="deleted">حذف‌شده</option>
                   </select>
                 </div>
               }
@@ -1297,42 +1935,135 @@ export default function CDNPage() {
           ) : null}
 
           {tab === "nodes" ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {nodes.map((node) => (
-                <div key={node.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                        <Server className="h-4 w-4 text-slate-400" />
-                        {node.name}
-                      </h3>
-                      <p className="text-[11px] text-slate-400" dir="ltr">{node.ip}</p>
-                    </div>
-                    <Badge status={node.health_status} label={node.is_active ? "فعال" : "غیرفعال"} />
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] text-slate-400">کنترل‌پلین</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Badge
+                      status={opsFleet?.api?.ok ? "ok" : "error"}
+                      label={opsFleet?.api?.ok ? "در دسترس" : "قطع"}
+                    />
                   </div>
-                  <div className="mt-3 space-y-2 text-[11px]">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">نقش / منطقه</span>
-                      <span className="font-medium text-slate-700">
-                        {node.role_display} · {node.region}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Nginx</span>
-                      <Badge status={node.nginx_status} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">PowerDNS</span>
-                      <Badge status={node.pdns_status} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">آخرین بررسی</span>
-                      <span className="text-slate-600">{formatJalaliShort(node.last_check_at)}</span>
-                    </div>
-                  </div>
+                  <p className="mt-2 truncate text-[10px] text-slate-400" dir="ltr">
+                    {opsFleet?.api?.base_url || opsFleet?.api?.detail || "—"}
+                  </p>
                 </div>
-              ))}
-              {!nodes.length ? <Empty text="نودی ثبت نشده است." /> : null}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] text-slate-400">نودهای ناوگان</p>
+                  <p className="mt-1 text-lg font-bold text-slate-800">
+                    {faNum(opsFleet?.fleet?.healthy ?? 0)} / {faNum(opsFleet?.fleet?.total ?? opsNodes.length)}
+                  </p>
+                  <p className="text-[10px] text-slate-400">سالم / کل · فعال {faNum(opsFleet?.fleet?.active ?? 0)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] text-slate-400">ایجنت‌ها</p>
+                  <p className="mt-1 text-lg font-bold text-slate-800">
+                    {faNum(opsAgents?.summary.ok ?? 0)} / {faNum(opsAgents?.summary.total ?? 0)}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    نسخه {opsAgents?.expected_version || "—"}
+                    {opsAgents && (opsAgents.summary.outdated || opsAgents.summary.offline)
+                      ? ` · ${faNum(opsAgents.summary.outdated)} قدیمی · ${faNum(opsAgents.summary.offline)} آفلاین`
+                      : ""}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] text-slate-400">GeoDNS / LUA</p>
+                  <p className="mt-1 text-lg font-bold text-slate-800">{faNum(opsFleet?.lua?.zones ?? 0)} زون</p>
+                  <p className="text-[10px] text-slate-400">
+                    {faNum(opsFleet?.lua?.records ?? 0)} رکورد · {faNum(opsFleet?.lua?.custom ?? 0)} سفارشی
+                  </p>
+                </div>
+              </div>
+
+              {opsLoading && !opsNodes.length ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {(opsNodes.length ? opsNodes : nodes).map((node) => {
+                    const ops = opsNodes.find((item) => String(item.id) === String(node.id)) ?? null
+                    const agent = opsAgents?.agents.find(
+                      (item) => item.name === node.name || String(item.id) === String(node.id)
+                    )
+                    return (
+                      <div key={node.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                              <Server className="h-4 w-4 text-slate-400" />
+                              {node.name}
+                            </h3>
+                            <p className="text-[11px] text-slate-400" dir="ltr">{node.ip}</p>
+                          </div>
+                          <Badge status={node.health_status} label={node.is_active ? "فعال" : "غیرفعال"} />
+                        </div>
+                        <div className="mt-3 space-y-2 text-[11px]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">نقش / منطقه</span>
+                            <span className="font-medium text-slate-700">
+                              {("role_display" in node ? node.role_display : node.role)} · {node.region}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">وزن GeoDNS</span>
+                            <span className="font-medium text-slate-700" title="سهم نسبی بین نودهای ایران">
+                              {faNum(ops?.weight ?? 0)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Nginx</span>
+                            <Badge status={node.nginx_status} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">PowerDNS</span>
+                            <Badge status={node.pdns_status} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">ایجنت</span>
+                            {agent ? (
+                              <span className="flex items-center gap-1">
+                                <Badge status={agent.agent_status} label={`v${agent.version || "?"}`} />
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </div>
+                          {ops?.ns_hostname ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">NS</span>
+                              <span className="truncate text-slate-600" dir="ltr">{ops.ns_hostname}</span>
+                            </div>
+                          ) : null}
+                          {ops?.ssh_port ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">SSH</span>
+                              <span className="text-slate-600" dir="ltr">:{ops.ssh_port}</span>
+                            </div>
+                          ) : null}
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">
+                              {ops ? "آخرین بررسی ایجنت" : "آخرین بررسی"}
+                            </span>
+                            <span className="text-slate-600">
+                              {formatJalaliShort(agent?.checked_at || ("last_check_at" in node ? node.last_check_at : null))}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {!opsNodes.length && !nodes.length ? <Empty text="نودی ثبت نشده است." /> : null}
+                </div>
+              )}
+
+              {opsFleet?.degraded ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-700">
+                  کنترل‌پلین CDN در دسترس نیست: {opsFleet.detail || "خطای نامشخص"}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </>
@@ -1423,6 +2154,18 @@ export default function CDNPage() {
                       <div className="rounded-lg bg-slate-50 p-2">
                         <p className="text-slate-400">حالت پرداخت</p>
                         <p className="font-semibold text-slate-700">{subscription.billing_mode_display}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-2">
+                        <p className="text-slate-400">مهلت پرداخت</p>
+                        <p className="font-semibold text-slate-700">
+                          {subscription.grace_until ? formatJalali(subscription.grace_until) : "—"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-2">
+                        <p className="text-slate-400">ترافیک مازاد</p>
+                        <p className="font-semibold text-slate-700">
+                          {subscription.traffic_overage_allowed ? "مجاز" : "غیرمجاز"}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-3">
@@ -1688,6 +2431,193 @@ export default function CDNPage() {
                       ) : null}
                     </div>
                   </div>
+                </div>
+
+                <div>
+                  <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                    <ShieldCheck className="h-4 w-4 text-slate-400" />
+                    کنترل‌های لبه (WAF، کش و SSL)
+                  </h4>
+                  {domainControlsLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                    </div>
+                  ) : domainControls ? (
+                    <div className="grid gap-3 lg:grid-cols-3">
+                      <div className="rounded-xl border border-slate-200 p-3 text-[11px]">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                            WAF
+                          </span>
+                          <Badge
+                            status={domainControls.waf?.enabled ? "ok" : "unknown"}
+                            label={domainControls.waf?.enabled ? "فعال" : "غیرفعال"}
+                          />
+                        </div>
+                        {domainControls.waf?.available === false ? (
+                          <p className="rounded-lg bg-slate-50 p-2 text-slate-400">
+                            سیاست WAF برای این دامنه در دسترس نیست.
+                          </p>
+                        ) : domainControls.waf ? (
+                          <div className="space-y-1.5 text-slate-500">
+                            <p className="flex justify-between">
+                              <span>حالت / پروفایل</span>
+                              <b className="text-slate-700">
+                                {domainControls.waf.mode} · {domainControls.waf.profile}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>محدودیت نرخ</span>
+                              <b className="text-slate-700" dir="ltr">
+                                {faNum(domainControls.waf.rate_limit_rpm)} rpm / {faNum(domainControls.waf.rate_limit_burst)} burst
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>حجم بدنه</span>
+                              <b className="text-slate-700">{faNum(domainControls.waf.body_limit_kb)} KB</b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>Zero-day / AI</span>
+                              <b className="text-slate-700">
+                                {domainControls.waf.zero_day ? "روشن" : "خاموش"} /{" "}
+                                {domainControls.waf.ai_confirm ? "تأیید" : "بدون تأیید"}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>حالت خطا</span>
+                              <b className="text-slate-700">{domainControls.waf.fail_mode}</b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>قوانین مستثنی</span>
+                              <b className="text-slate-700">{faNum(domainControls.waf.excluded_rule_ids.length)}</b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>نسخه پیکربندی</span>
+                              <b className="text-slate-700">{faNum(domainControls.waf.config_version)}</b>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400">اطلاعات WAF موجود نیست.</p>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 p-3 text-[11px]">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                            <Cpu className="h-3.5 w-3.5 text-indigo-500" />
+                            پیکربندی کش
+                          </span>
+                          <Badge
+                            status={domainControls.cache?.available ? "ok" : "unknown"}
+                            label={domainControls.cache?.cms_preset || "—"}
+                          />
+                        </div>
+                        {domainControls.cache ? (
+                          <div className="space-y-1.5 text-slate-500">
+                            <p className="flex justify-between">
+                              <span>TTL 200 / 301 / 404</span>
+                              <b className="text-slate-700" dir="ltr">
+                                {domainControls.cache.cache_ttl_200} / {domainControls.cache.cache_ttl_301} /{" "}
+                                {domainControls.cache.cache_ttl_404}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>HTTPS اجباری</span>
+                              <b className="text-slate-700">{domainControls.cache.force_https ? "بله" : "خیر"}</b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>HSTS</span>
+                              <b className="text-slate-700">
+                                {domainControls.cache.hsts_enabled
+                                  ? `فعال · ${faNum(domainControls.cache.hsts_max_age)}s`
+                                  : "غیرفعال"}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>Stale / Revalidate</span>
+                              <b className="text-slate-700">
+                                {domainControls.cache.stale_while_revalidate ? "روشن" : "خاموش"} /{" "}
+                                {domainControls.cache.proxy_cache_revalidate ? "روشن" : "خاموش"}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>Bypass URI / Cookie</span>
+                              <b className="text-slate-700">
+                                {faNum(domainControls.cache.bypass_uri_presets.length)} /{" "}
+                                {faNum(domainControls.cache.bypass_cookie_presets.length)}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>نسخه / آخرین استقرار</span>
+                              <b className="text-slate-700">
+                                {faNum(domainControls.cache.config_version)} ·{" "}
+                                {formatJalaliShort(domainControls.cache.last_deployed_at)}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>منبع</span>
+                              <b className="text-slate-700">
+                                {domainControls.cache.is_admin_override ? "پنل ادمین" : "کنترل‌پلین"}
+                              </b>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400">پیکربندی کش موجود نیست.</p>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 p-3 text-[11px]">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                            <ShieldCheck className="h-3.5 w-3.5 text-sky-500" />
+                            گواهی SSL
+                          </span>
+                          <Badge status={domainControls.ssl?.ssl_status || "unknown"} />
+                        </div>
+                        {domainControls.ssl ? (
+                          <div className="space-y-1.5 text-slate-500">
+                            <p className="flex justify-between">
+                              <span>نوع</span>
+                              <b className="text-slate-700">{domainControls.ssl.ssl_type}</b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>انقضا</span>
+                              <b className="text-slate-700">{formatJalaliShort(domainControls.ssl.ssl_expires_at)}</b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>تمدید خودکار</span>
+                              <b className="text-slate-700">
+                                {domainControls.ssl.certificate?.auto_renew ? "بله" : "خیر"}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>نودهای استقرار</span>
+                              <b className="text-slate-700">
+                                {faNum(domainControls.ssl.certificate?.deployed_nodes.length ?? 0)}
+                              </b>
+                            </p>
+                            <p className="flex justify-between gap-2">
+                              <span>SAN</span>
+                              <b className="truncate text-slate-700" dir="ltr">
+                                {domainControls.ssl.certificate?.san_names.join(", ") || "—"}
+                              </b>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>وضعیت محلی</span>
+                              <b className="text-slate-700">{domainControls.ssl.local_ssl_status || "—"}</b>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400">اطلاعات گواهی موجود نیست.</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="rounded-lg bg-slate-50 p-3 text-[11px] text-slate-400">
+                      اطلاعات کنترل‌های لبه در دسترس نیست.
+                    </p>
+                  )}
                 </div>
               </div>
             ) : null}
