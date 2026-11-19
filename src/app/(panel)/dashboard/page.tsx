@@ -21,6 +21,7 @@ import {
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/auth-store"
 import { PANEL_ROLE_LABELS } from "@/lib/roles"
+import { TaskHeatmap } from "@/components/task-heatmap"
 import { cn } from "@/lib/utils"
 import {
   Funnel,
@@ -657,6 +658,9 @@ export default function DashboardPage() {
               tone="text-slate-600"
             />
           </div>
+
+          {/* Team task activity — GitHub-style contribution graph */}
+          <TaskHeatmap />
 
           {/* CDN product highlight */}
           <section className="rounded-2xl border border-pink-200 bg-gradient-to-l from-pink-50 via-white to-white p-4 md:p-5">
