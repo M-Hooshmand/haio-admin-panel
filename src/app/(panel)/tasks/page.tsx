@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils"
 
 /* ─────────────────────────────── types ─────────────────────────────── */
 
-type Status = "todo" | "in_progress" | "blocked" | "done"
+type Status = "todo" | "in_progress" | "testing" | "blocked" | "done"
 type Priority = "low" | "normal" | "high" | "urgent"
 
 interface Task {
@@ -79,7 +79,13 @@ interface TaskPayload {
 
 /* ─────────────────────────────── meta ─────────────────────────────── */
 
-const STATUS_ORDER: Status[] = ["todo", "in_progress", "blocked", "done"]
+const STATUS_ORDER: Status[] = [
+  "todo",
+  "in_progress",
+  "testing",
+  "blocked",
+  "done",
+]
 
 const STATUS_META: Record<
   Status,
@@ -96,6 +102,12 @@ const STATUS_META: Record<
     dot: "bg-indigo-500",
     header: "text-indigo-700",
     soft: "bg-indigo-50 text-indigo-700",
+  },
+  testing: {
+    label: "در حال تست",
+    dot: "bg-violet-500",
+    header: "text-violet-700",
+    soft: "bg-violet-50 text-violet-700",
   },
   blocked: {
     label: "متوقف",
@@ -143,14 +155,16 @@ function isOverdue(task: Task): boolean {
 function nextStatus(status: Status): Status {
   if (status === "todo") return "in_progress"
   if (status === "blocked") return "in_progress"
-  if (status === "in_progress") return "done"
+  if (status === "in_progress") return "testing"
+  if (status === "testing") return "done"
   return "todo"
 }
 
 function nextStatusLabel(status: Status): string {
   if (status === "todo") return "شروع کار"
   if (status === "blocked") return "رفع توقف"
-  if (status === "in_progress") return "انجام شد"
+  if (status === "in_progress") return "ارسال به تست"
+  if (status === "testing") return "انجام شد"
   return "بازگشت به انجام‌نشده"
 }
 
@@ -877,6 +891,7 @@ export default function TasksPage() {
     const grouped: Record<Status, Task[]> = {
       todo: [],
       in_progress: [],
+      testing: [],
       blocked: [],
       done: [],
     }
@@ -1091,7 +1106,7 @@ export default function TasksPage() {
           <p className="text-xs">در حال بارگذاری تخته…</p>
         </div>
       ) : view === "board" ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {STATUS_ORDER.map((status) => {
             const meta = STATUS_META[status]
             const rows = columns[status]
