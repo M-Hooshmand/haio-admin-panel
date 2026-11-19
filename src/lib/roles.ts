@@ -80,6 +80,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
   },
   {
+    key: "tasks",
+    href: "/tasks",
+    title: "تسک‌های تیم",
+    description: "تخته کارهای تیم: ساخت، واگذاری و تغییر وضعیت",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+  },
+  {
     key: "cdn",
     href: "/cdn",
     title: "CDN",

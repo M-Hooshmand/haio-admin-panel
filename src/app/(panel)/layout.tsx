@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Ticket,
   Users,
+  ClipboardList,
   X,
 } from "lucide-react"
 import { useAuthStore } from "@/stores/auth-store"
@@ -40,6 +41,7 @@ import { CloudzyStatusWidget } from "@/components/cloudzy-status"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
+  tasks: ClipboardList,
   cdn: CloudCog,
   users: Users,
   organizations: Building2,
