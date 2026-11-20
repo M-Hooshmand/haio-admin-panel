@@ -9,15 +9,21 @@ import {
   Check,
   CheckCircle2,
   CircleDashed,
+  Clock,
+  Github,
   Inbox,
   LayoutList,
+  Link2,
   Loader2,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   Search,
+  Square,
   SquareKanban,
   Trash2,
+  Unlink,
   UserRound,
   X,
 } from "lucide-react"
@@ -48,8 +54,25 @@ interface Task {
   created_by_name: string
   due_date: string | null
   completed_at: string | null
+  completion_note: string
+  completed_by_name: string
+  github_repo: string
+  github_issue_number: number | null
+  github_issue_url: string
+  time_spent_seconds: number
+  my_running_since: string | null
   created_at: string
   updated_at: string
+}
+
+interface TimeEntry {
+  id: string
+  user: number | null
+  user_name: string
+  started_at: string
+  ended_at: string | null
+  seconds: number
+  running: boolean
 }
 
 interface Member {
@@ -141,6 +164,30 @@ const PRIORITY_RANK: Record<Priority, number> = {
 
 function faNum(value: number): string {
   return value.toLocaleString("fa-IR")
+}
+
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+  const pad = (value: number) => String(value).padStart(2, "0")
+  return hours > 0
+    ? `${faNum(hours)}:${pad(minutes)}:${pad(secs)}`
+    : `${faNum(minutes)}:${pad(secs)}`
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return "—"
+  return new Date(value).toLocaleString("fa-IR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  })
+}
+
+function runningSeconds(since: string | null, nowTs: number): number {
+  if (!since) return 0
+  return Math.max(0, Math.floor((nowTs - Date.parse(since)) / 1000))
 }
 
 function initials(name: string): string {
@@ -275,19 +322,27 @@ function EmptyColumn({ label }: { label: string }) {
 function TaskCard({
   task,
   dragging,
+  nowTs,
   onEdit,
   onAdvance,
+  onToggleTimer,
   onDragStart,
   onDragEnd,
 }: {
   task: Task
   dragging: boolean
+  nowTs: number
   onEdit: () => void
   onAdvance: () => void
+  onToggleTimer: () => void
   onDragStart: (event: React.DragEvent<HTMLDivElement>) => void
   onDragEnd: () => void
 }) {
   const overdue = isOverdue(task)
+  const running = Boolean(task.my_running_since)
+  const tracked = running
+    ? runningSeconds(task.my_running_since, nowTs)
+    : task.time_spent_seconds
   return (
     <div
       draggable
@@ -297,6 +352,7 @@ function TaskCard({
         "group cursor-grab rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition active:cursor-grabbing",
         "hover:border-slate-300 hover:shadow-md",
         dragging && "opacity-40",
+        running && "border-indigo-300 ring-2 ring-indigo-100",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -314,6 +370,20 @@ function TaskCard({
               <CalendarDays className="h-3 w-3" />
               {formatJalali(task.due_date)}
             </span>
+          ) : null}
+          {task.github_issue_number ? (
+            <a
+              href={task.github_issue_url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => event.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500 hover:border-slate-300 hover:text-slate-800"
+              title={`${task.github_repo} #${task.github_issue_number}`}
+              dir="ltr"
+            >
+              <Github className="h-3 w-3" />
+              #{task.github_issue_number}
+            </a>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
@@ -368,12 +438,49 @@ function TaskCard({
             بدون مسئول
           </span>
         )}
-        {overdue ? (
-          <span className="flex items-center gap-1 text-[10px] font-medium text-rose-600">
-            <AlertTriangle className="h-3 w-3" />
-            عقب‌افتاده
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1">
+          {overdue ? (
+            <span className="flex items-center gap-1 text-[10px] font-medium text-rose-600">
+              <AlertTriangle className="h-3 w-3" />
+              عقب‌افتاده
+            </span>
+          ) : null}
+          {tracked > 0 || running ? (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] tabular-nums",
+                running
+                  ? "bg-indigo-50 font-medium text-indigo-700"
+                  : "bg-slate-100 text-slate-600",
+              )}
+              title={running ? "زمان این جلسه (در حال اجرا)" : "زمان ثبت‌شده"}
+            >
+              <Clock className="h-3 w-3" />
+              <span dir="ltr">{formatDuration(tracked)}</span>
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleTimer()
+            }}
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-full border text-[10px] transition",
+              running
+                ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
+                : "border-slate-200 bg-white text-slate-400 hover:border-indigo-300 hover:text-indigo-600",
+            )}
+            aria-label={running ? "توقف زمان‌سنج" : "شروع زمان‌سنج"}
+            title={running ? "توقف زمان‌سنج" : "شروع زمان‌سنج"}
+          >
+            {running ? (
+              <Square className="h-3 w-3 fill-current" />
+            ) : (
+              <Play className="h-3 w-3 fill-current" />
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -387,18 +494,22 @@ function TaskDrawer({
   members,
   defaultStatus,
   defaultAssignee,
+  nowTs,
   onClose,
   onSaved,
   onDeleted,
+  onTaskUpdated,
 }: {
   open: boolean
   task: Task | null
   members: Member[]
   defaultStatus: Status
   defaultAssignee: number | null
+  nowTs: number
   onClose: () => void
   onSaved: (task: Task, created: boolean) => void
   onDeleted: (task: Task) => void
+  onTaskUpdated: (task: Task) => void
 }) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -411,6 +522,14 @@ function TaskDrawer({
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState("")
+  const [entries, setEntries] = useState<TimeEntry[]>([])
+  const [timeLoading, setTimeLoading] = useState(false)
+  const [timerBusy, setTimerBusy] = useState(false)
+  const [note, setNote] = useState("")
+  const [closing, setClosing] = useState(false)
+  const [issueRepo, setIssueRepo] = useState("")
+  const [issueNumber, setIssueNumber] = useState("")
+  const [issueBusy, setIssueBusy] = useState<"" | "create" | "link" | "unlink">("")
 
   useEffect(() => {
     if (!open) return
@@ -425,7 +544,11 @@ function TaskDrawer({
     setDeleting(false)
     setConfirmDelete(false)
     setError("")
-  }, [open, task, defaultStatus, defaultAssignee])
+    setNote("")
+    setIssueRepo(task?.github_repo || "")
+    setIssueNumber("")
+    setIssueBusy("")
+  }, [open, task?.id, defaultStatus, defaultAssignee])
 
   useEffect(() => {
     if (!open) return
@@ -445,6 +568,110 @@ function TaskDrawer({
         member.email.toLowerCase().includes(query),
     )
   }, [members, memberQuery])
+
+  const taskId = task?.id
+  const taskRunningSince = task?.my_running_since ?? null
+  const taskSeconds = task?.time_spent_seconds ?? 0
+
+  const loadTime = useCallback(async () => {
+    if (!taskId) return
+    setTimeLoading(true)
+    try {
+      const { data } = await api.get<{ total_seconds: number; entries: TimeEntry[] }>(
+        `/panel/tasks/${taskId}/time/`,
+      )
+      setEntries(data.entries ?? [])
+    } catch {
+      // The header total still works; the interval list is a bonus.
+    } finally {
+      setTimeLoading(false)
+    }
+  }, [taskId])
+
+  useEffect(() => {
+    if (!open || !taskId) {
+      setEntries([])
+      return
+    }
+    void loadTime()
+  }, [open, taskId, taskRunningSince, taskSeconds, loadTime])
+
+  const toggleTimer = async () => {
+    if (!task) return
+    const running = Boolean(task.my_running_since)
+    setTimerBusy(true)
+    setError("")
+    try {
+      const { data } = await api.post<Task>(
+        `/panel/tasks/${task.id}/${running ? "stop" : "start"}/`,
+      )
+      onTaskUpdated(data)
+    } catch (caught) {
+      setError(errorMessage(caught))
+    } finally {
+      setTimerBusy(false)
+    }
+  }
+
+  const completeTask = async () => {
+    if (!task) return
+    setClosing(true)
+    setError("")
+    try {
+      const { data } = await api.post<Task>(`/panel/tasks/${task.id}/complete/`, {
+        note: note.trim(),
+      })
+      onTaskUpdated(data)
+      setNote("")
+      setStatus("done")
+    } catch (caught) {
+      setError(errorMessage(caught))
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  const saveIssue = async (mode: "create" | "link") => {
+    if (!task) return
+    const repo = issueRepo.trim()
+    if (!repo) {
+      setError("مخزن گیت‌هاب را به شکل owner/name بنویسید.")
+      return
+    }
+    if (mode === "link" && !issueNumber.trim()) {
+      setError("شمارهٔ issue را بنویسید.")
+      return
+    }
+    setIssueBusy(mode)
+    setError("")
+    try {
+      const payload =
+        mode === "link"
+          ? { repo, number: Number(issueNumber) }
+          : { repo, create: true }
+      const { data } = await api.post<Task>(`/panel/tasks/${task.id}/issue/`, payload)
+      onTaskUpdated(data)
+      setIssueNumber("")
+    } catch (caught) {
+      setError(errorMessage(caught))
+    } finally {
+      setIssueBusy("")
+    }
+  }
+
+  const unlinkIssue = async () => {
+    if (!task) return
+    setIssueBusy("unlink")
+    setError("")
+    try {
+      const { data } = await api.delete<Task>(`/panel/tasks/${task.id}/issue/`)
+      onTaskUpdated(data)
+    } catch (caught) {
+      setError(errorMessage(caught))
+    } finally {
+      setIssueBusy("")
+    }
+  }
 
   const save = async () => {
     const cleanTitle = title.trim()
@@ -563,6 +790,179 @@ function TaskDrawer({
             />
           </div>
 
+          {task ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                    <Clock className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-medium text-slate-700">زمان کار</p>
+                    <p className="text-[10px] text-slate-400">
+                      جمع ثبت‌شده:{" "}
+                      <span className="tabular-nums" dir="ltr">
+                        {formatDuration(task.time_spent_seconds)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={task.my_running_since ? "destructive" : "outline"}
+                  onClick={toggleTimer}
+                  disabled={timerBusy}
+                >
+                  {timerBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : task.my_running_since ? (
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                  )}
+                  {task.my_running_since
+                    ? `توقف (${formatDuration(runningSeconds(task.my_running_since, nowTs))})`
+                    : "شروع زمان‌سنج"}
+                </Button>
+              </div>
+
+              <div className="mt-2 max-h-36 space-y-1 overflow-y-auto scrollbar-thin">
+                {timeLoading && entries.length === 0 ? (
+                  <p className="px-1 py-2 text-[11px] text-slate-400">
+                    در حال خواندن بازه‌های زمانی…
+                  </p>
+                ) : entries.length === 0 ? (
+                  <p className="px-1 py-2 text-[11px] text-slate-400">
+                    هنوز زمانی روی این تسک ثبت نشده.
+                  </p>
+                ) : (
+                  entries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[10px]"
+                    >
+                      <span className="flex min-w-0 items-center gap-1.5 text-slate-600">
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 shrink-0 rounded-full",
+                            entry.running ? "animate-pulse bg-emerald-500" : "bg-slate-300",
+                          )}
+                        />
+                        <span className="truncate">{entry.user_name || "—"}</span>
+                        <span className="shrink-0 text-slate-400">
+                          {formatDateTime(entry.started_at)}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 tabular-nums",
+                          entry.running ? "font-medium text-emerald-600" : "text-slate-600",
+                        )}
+                        dir="ltr"
+                      >
+                        {formatDuration(
+                          entry.running
+                            ? runningSeconds(entry.started_at, nowTs)
+                            : entry.seconds,
+                        )}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {task ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-center gap-2">
+                <Github className="h-4 w-4 text-slate-400" />
+                <p className="text-xs font-medium text-slate-700">issue گیت‌هاب</p>
+              </div>
+
+              {task.github_issue_number ? (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
+                  <a
+                    href={task.github_issue_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-w-0 items-center gap-1.5 text-[11px] text-indigo-700 hover:underline"
+                    dir="ltr"
+                  >
+                    <Link2 className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {task.github_repo} #{task.github_issue_number}
+                    </span>
+                  </a>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={unlinkIssue}
+                    disabled={issueBusy === "unlink"}
+                    className="h-7 px-2 text-[11px]"
+                  >
+                    {issueBusy === "unlink" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Unlink className="h-3.5 w-3.5" />
+                    )}
+                    حذف اتصال
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <Input
+                    value={issueRepo}
+                    onChange={(event) => setIssueRepo(event.target.value)}
+                    placeholder="haioco/ai-paas"
+                    dir="ltr"
+                    className="h-9 text-xs"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={issueNumber}
+                      onChange={(event) => setIssueNumber(event.target.value)}
+                      placeholder="شمارهٔ موجود (اختیاری)"
+                      inputMode="numeric"
+                      className="h-9 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => saveIssue("create")}
+                      disabled={Boolean(issueBusy)}
+                      className="shrink-0"
+                    >
+                      {issueBusy === "create" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                      ساخت issue
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => saveIssue("link")}
+                      disabled={Boolean(issueBusy)}
+                      className="shrink-0"
+                    >
+                      {issueBusy === "link" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Link2 className="h-4 w-4" />
+                      )}
+                      اتصال
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
@@ -672,6 +1072,56 @@ function TaskDrawer({
               </div>
             </div>
           </div>
+          {task ? (
+            task.status === "done" ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+                <div className="flex items-center gap-2 text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <p className="text-xs font-medium">نتیجهٔ کار</p>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-emerald-900/90">
+                  {task.completion_note || "بدون یادداشت نتیجه بسته شده."}
+                </p>
+                <p className="mt-2 text-[10px] text-emerald-700/70">
+                  {task.completed_by_name
+                    ? `بسته‌شده توسط ${task.completed_by_name}`
+                    : "بسته شده"}
+                  {task.completed_at ? ` · ${formatDateTime(task.completed_at)}` : ""}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                  بستن تسک با یادداشت نتیجه
+                </label>
+                <textarea
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  rows={3}
+                  placeholder="چه چیزی تغییر کرد و چطور تست شد؟"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-slate-400">
+                    تایمر در حال اجرا خودکار بسته می‌شود.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={completeTask}
+                    disabled={closing}
+                  >
+                    {closing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    پایان تسک
+                  </Button>
+                </div>
+              </div>
+            )
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-white p-4">
@@ -739,6 +1189,7 @@ export default function TasksPage() {
   const [drawerStatus, setDrawerStatus] = useState<Status>("todo")
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<Status | null>(null)
+  const [nowTs, setNowTs] = useState(() => Date.now())
 
   const requestSeq = useRef(0)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -886,6 +1337,54 @@ export default function TasksPage() {
     },
     [tasks, patchTask],
   )
+
+  const toggleTimer = useCallback(
+    async (task: Task) => {
+      const running = Boolean(task.my_running_since)
+      try {
+        const { data } = await api.post<Task>(
+          `/panel/tasks/${task.id}/${running ? "stop" : "start"}/`,
+        )
+        setTasks((rows) =>
+          rows.map((row) => (row.id === data.id ? data : row)),
+        )
+        showFlash(running ? "زمان‌سنج متوقف شد." : "زمان‌سنج شروع شد.")
+        // Starting a timer stops the caller's other timers server-side.
+        if (!running) void load(true)
+      } catch (caught) {
+        setError(errorMessage(caught))
+      }
+    },
+    [load, showFlash],
+  )
+
+  const applyTask = useCallback(
+    (task: Task) => {
+      setTasks((rows) =>
+        rows.some((row) => row.id === task.id)
+          ? rows.map((row) => (row.id === task.id ? task : row))
+          : [task, ...rows],
+      )
+      void loadSummary()
+    },
+    [loadSummary],
+  )
+
+  const anyRunning = useMemo(
+    () => tasks.some((task) => Boolean(task.my_running_since)),
+    [tasks],
+  )
+
+  useEffect(() => {
+    if (!anyRunning) return
+    const timer = setInterval(() => setNowTs(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [anyRunning])
+
+  const activeTask = useMemo(() => {
+    if (!editing) return null
+    return tasks.find((row) => row.id === editing.id) ?? editing
+  }, [editing, tasks])
 
   const columns = useMemo(() => {
     const grouped: Record<Status, Task[]> = {
@@ -1155,8 +1654,10 @@ export default function TasksPage() {
                       key={task.id}
                       task={task}
                       dragging={draggingId === task.id}
+                      nowTs={nowTs}
                       onEdit={() => openEdit(task)}
                       onAdvance={() => moveTask(task.id, nextStatus(task.status))}
+                      onToggleTimer={() => void toggleTimer(task)}
                       onDragStart={(event) => {
                         event.dataTransfer.setData("text/plain", task.id)
                         event.dataTransfer.effectAllowed = "move"
@@ -1184,6 +1685,7 @@ export default function TasksPage() {
                   <th className="px-4 py-3 font-medium">وضعیت</th>
                   <th className="px-4 py-3 font-medium">اولویت</th>
                   <th className="px-4 py-3 font-medium">سررسید</th>
+                  <th className="px-4 py-3 font-medium">زمان</th>
                   <th className="px-4 py-3 font-medium">عملیات</th>
                 </tr>
               </thead>
@@ -1253,6 +1755,54 @@ export default function TasksPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="text-[11px] tabular-nums text-slate-600"
+                            dir="ltr"
+                          >
+                            {formatDuration(
+                              task.my_running_since
+                                ? runningSeconds(task.my_running_since, nowTs)
+                                : task.time_spent_seconds,
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void toggleTimer(task)}
+                            className={cn(
+                              "flex h-6 w-6 items-center justify-center rounded-full border transition",
+                              task.my_running_since
+                                ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
+                                : "border-slate-200 bg-white text-slate-400 hover:border-indigo-300 hover:text-indigo-600",
+                            )}
+                            aria-label={
+                              task.my_running_since ? "توقف زمان‌سنج" : "شروع زمان‌سنج"
+                            }
+                            title={
+                              task.my_running_since ? "توقف زمان‌سنج" : "شروع زمان‌سنج"
+                            }
+                          >
+                            {task.my_running_since ? (
+                              <Square className="h-3 w-3 fill-current" />
+                            ) : (
+                              <Play className="h-3 w-3 fill-current" />
+                            )}
+                          </button>
+                          {task.github_issue_number ? (
+                            <a
+                              href={task.github_issue_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                              title={`${task.github_repo} #${task.github_issue_number}`}
+                              aria-label="issue گیت‌هاب"
+                            >
+                              <Github className="h-3.5 w-3.5" />
+                            </a>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
@@ -1307,13 +1857,15 @@ export default function TasksPage() {
 
       <TaskDrawer
         open={drawerOpen}
-        task={editing}
+        task={activeTask}
         members={members}
         defaultStatus={drawerStatus}
         defaultAssignee={selfId}
+        nowTs={nowTs}
         onClose={() => setDrawerOpen(false)}
         onSaved={onSaved}
         onDeleted={onDeleted}
+        onTaskUpdated={applyTask}
       />
     </div>
   )
