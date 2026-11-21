@@ -144,6 +144,12 @@ interface CustomerDetail {
 
 const PAGE_SIZE = 25
 
+// Customer portal origin. Override with NEXT_PUBLIC_PORTAL_URL when the admin
+// panel runs against a staging portal.
+const PORTAL_URL = (
+  process.env.NEXT_PUBLIC_PORTAL_URL ?? "https://my.haio.ir"
+).replace(/\/+$/, "")
+
 const VERIFICATION_LABELS: Record<VerificationLevel, string> = {
   full: "احراز شده",
   partial: "ناقص",
@@ -352,6 +358,8 @@ export default function UsersPage() {
   const [ordering, setOrdering] = useState("created")
 
   const [selected, setSelected] = useState<CustomerRow | null>(null)
+  const [impersonatingId, setImpersonatingId] = useState<number | null>(null)
+  const [actionError, setActionError] = useState("")
 
   const requestId = useRef(0)
 
@@ -406,6 +414,39 @@ export default function UsersPage() {
     fetchRows()
     fetchMeta()
   }
+
+  const impersonate = useCallback(async (row: CustomerRow) => {
+    // Open the tab synchronously, inside the click gesture, then sever the
+    // opener link *before* the ticket exists. This avoids two problems:
+    // popup blockers (window.open after an await is rejected) and the
+    // opener race where the portal tab could reach back into the admin panel.
+    const win = window.open("about:blank", "_blank")
+    if (!win) {
+      setActionError(
+        "مرورگر باز کردن تب جدید را مسدود کرد؛ اجازه بازشدن پنجره (pop-up) را بدهید و دوباره تلاش کنید.",
+      )
+      return
+    }
+    win.opener = null
+
+    setImpersonatingId(row.id)
+    setActionError("")
+    try {
+      const { data } = await api.post<{ ticket: string }>(
+        `/panel/customers/${row.id}/impersonate/`,
+      )
+      // The ticket travels in the fragment: it never hits a server log and the
+      // portal swaps it for an access token within seconds.
+      const url = `${PORTAL_URL}/impersonate#ticket=${encodeURIComponent(data.ticket)}`
+      win.location.replace(url)
+    } catch (err) {
+      // Do not leave an empty tab behind when the panel call fails.
+      win.close()
+      setActionError(extractError(err))
+    } finally {
+      setImpersonatingId(null)
+    }
+  }, [])
 
   const verifiedPct = useMemo(() => {
     if (!meta?.total) return "۰"
@@ -523,6 +564,19 @@ export default function UsersPage() {
 
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
+      ) : null}
+
+      {actionError ? (
+        <div className="flex items-start justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <span>{actionError}</span>
+          <button
+            onClick={() => setActionError("")}
+            className="rounded-lg p-1 text-amber-500 hover:bg-amber-100"
+            aria-label="بستن"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -656,7 +710,23 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-500">{formatDateTime(row.last_login)}</td>
                   <td className="px-4 py-3 text-left">
-                    <ChevronLeft className="h-4 w-4 text-slate-300" />
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        impersonate(row)
+                      }}
+                      disabled={impersonatingId === row.id}
+                      title={`ورود به پنل ${row.display_name}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {impersonatingId === row.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <LogIn className="h-3.5 w-3.5" />
+                      )}
+                      ورود
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -692,7 +762,12 @@ export default function UsersPage() {
       </div>
 
       {selected ? (
-        <CustomerDrawer customer={selected} onClose={() => setSelected(null)} />
+        <CustomerDrawer
+          customer={selected}
+          onClose={() => setSelected(null)}
+          onImpersonate={impersonate}
+          impersonating={impersonatingId === selected.id}
+        />
       ) : null}
     </div>
   )
@@ -759,7 +834,17 @@ function SectionCard({
   )
 }
 
-function CustomerDrawer({ customer, onClose }: { customer: CustomerRow; onClose: () => void }) {
+function CustomerDrawer({
+  customer,
+  onClose,
+  onImpersonate,
+  impersonating,
+}: {
+  customer: CustomerRow
+  onClose: () => void
+  onImpersonate: (row: CustomerRow) => void
+  impersonating: boolean
+}) {
   const [detail, setDetail] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -808,9 +893,24 @@ function CustomerDrawer({ customer, onClose }: { customer: CustomerRow; onClose:
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onImpersonate(data)}
+              disabled={impersonating}
+            >
+              {impersonating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LogIn className="h-4 w-4" />
+              )}
+              ورود به پنل کاربر
+            </Button>
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-4 scrollbar-thin">
