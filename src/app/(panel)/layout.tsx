@@ -17,6 +17,7 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  MessageSquare,
   ReceiptText,
   FileText,
   Globe,
@@ -55,6 +56,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   campaigns: Megaphone,
   monitoring: Activity,
   notifications: Bell,
+  messaging: MessageSquare,
   brain: BrainCircuit,
   assistant: Sparkles,
   reports: BarChart3,
@@ -150,19 +152,48 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           const Icon = ICONS[item.key] ?? LayoutDashboard
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-                active
-                  ? "bg-indigo-500/15 font-medium text-white"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white",
-              )}
-            >
-              <Icon className={cn("h-4.5 w-4.5", active ? "text-indigo-300" : "text-slate-400")} />
-              {item.title}
-            </Link>
+            <div key={item.key}>
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                  active
+                    ? "bg-indigo-500/15 font-medium text-white"
+                    : "text-slate-300 hover:bg-white/5 hover:text-white",
+                )}
+              >
+                <Icon className={cn("h-4.5 w-4.5", active ? "text-indigo-300" : "text-slate-400")} />
+                {item.title}
+              </Link>
+              {item.children?.length ? (
+                <div className="mt-1 space-y-1 border-r border-white/10 pr-2">
+                  {item.children.map((child) => {
+                    const childActive =
+                      pathname === child.href || pathname.startsWith(`${child.href}/`)
+                    return (
+                      <Link
+                        key={child.key}
+                        href={child.href}
+                        className={cn(
+                          "flex items-center gap-2 rounded-lg py-2 pr-4 pl-3 text-[13px] transition-colors",
+                          childActive
+                            ? "bg-indigo-500/10 font-medium text-white"
+                            : "text-slate-400 hover:bg-white/5 hover:text-white",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full",
+                            childActive ? "bg-indigo-300" : "bg-slate-500",
+                          )}
+                        />
+                        {child.title}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
           )
         })}
       </nav>

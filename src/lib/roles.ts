@@ -63,12 +63,20 @@ export interface PanelUser {
   created_at?: string
 }
 
+export interface NavChild {
+  key: string
+  href: string
+  title: string
+}
+
 export interface NavItem {
   key: string
   href: string
   title: string
   description: string
   roles: PanelRole[]
+  /** Sub-pages rendered under the item in the sidebar (e.g. SMS providers). */
+  children?: NavChild[]
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -162,6 +170,16 @@ export const NAV_ITEMS: NavItem[] = [
     title: "گزارش اعلان‌ها",
     description: "تاریخچه ارسال ایمیل و پیامک برای همه محصولات",
     roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+  },
+  {
+    key: "messaging",
+    href: "/messaging",
+    title: "سامانه‌های پیامکی",
+    description: "موجودی، پیامک‌های ارسالی و وضعیت تحویل",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+    children: [
+      { key: "melipayamak", href: "/messaging/melipayamak", title: "ملی‌پیامک" },
+    ],
   },
   {
     key: "wordpress_report",
