@@ -37,6 +37,9 @@ interface SmsMessage {
   status_label: string
   delivered: boolean
   failed: boolean
+  delivery_source?: string
+  rec_id?: string
+  provider_status_label?: string
   Parts: number | null
   RecCount: number | null
   RecSuccess: number | null
@@ -111,7 +114,13 @@ function StatusBadge({ row }: { row: SmsMessage }) {
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
         tone,
       )}
-      title={row.status_code === null ? "کد وضعیت از ارائه‌دهنده دریافت نشد" : `کد ${row.status_code}`}
+      title={
+        row.delivery_source === "deliveries2"
+          ? `استعلام مستقیم ملی‌پیامک — کد ${row.status_code}`
+          : row.provider_status_label
+            ? `فهرست پنل: ${row.provider_status_label} — استعلام دلیور برای این ردیف انجام نشد`
+            : "کد وضعیت از ارائه‌دهنده دریافت نشد"
+      }
     >
       <Icon className="h-3 w-3" />
       {row.status_label}
@@ -494,8 +503,11 @@ export default function MeliPayamakPage() {
       </div>
 
       <p className="text-[11px] leading-6 text-slate-400">
-        وضعیت‌ها مستقیم از ملی‌پیامک خوانده می‌شوند؛ داده سرور حداکثر چند ثانیه کش می‌شود تا
-        فراخوانی‌های پیاپی به ارائه‌دهنده محدود بماند. برای وضعیت یک شناسه مشخص از اندپوینت
+        وضعیت تحویل از استعلام مستقیم ملی‌پیامک (<span dir="ltr">GetDeliveries2</span>) خوانده
+        می‌شود، نه از ستون وضعیت فهرست پنل که برای پیامک‌های تحویل‌شده هم «نرسیده» نشان می‌دهد.
+        ردیف‌هایی که شناسهٔ ارسالشان در لاگ هایو پیدا نشود «نامشخص» می‌مانند. داده سرور چند
+        ثانیه کش می‌شود تا فراخوانی‌های پیاپی به ارائه‌دهنده محدود بماند؛ برای استعلام یک شناسه
+        مشخص از اندپوینت
         <code dir="ltr" className="mx-1">/staff/sms/melipayamak/delivery/</code>
         استفاده می‌شود.
       </p>
