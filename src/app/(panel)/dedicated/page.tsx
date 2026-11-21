@@ -51,6 +51,15 @@ interface InvoiceRef {
   paid_at: string | null
 }
 
+interface DedicatedAddress {
+  id?: string
+  address: string
+  role: "node" | "server" | string
+  role_label?: string
+  label: string
+  is_primary: boolean
+}
+
 interface DedicatedServerRow {
   id: string
   customer_kind: string
@@ -73,6 +82,7 @@ interface DedicatedServerRow {
   plan_name: string
   server_specs: string
   services: string
+  addresses: DedicatedAddress[]
   notes: string
   price: number
   discount: number
@@ -131,6 +141,7 @@ const EMPTY: DedicatedServerRow = {
   plan_name: "",
   server_specs: "",
   services: "",
+  addresses: [],
   notes: "",
   price: 0,
   discount: 0,
@@ -292,6 +303,29 @@ export default function DedicatedPage() {
   const setField = <K extends keyof DedicatedServerRow>(key: K, value: DedicatedServerRow[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
 
+  const addAddress = (role: "node" | "server" = "server") =>
+    setForm((current) => ({
+      ...current,
+      addresses: [
+        ...current.addresses,
+        { address: "", role, label: "", is_primary: false },
+      ],
+    }))
+
+  const updateAddress = (index: number, patch: Partial<DedicatedAddress>) =>
+    setForm((current) => ({
+      ...current,
+      addresses: current.addresses.map((row, i) =>
+        i === index ? { ...row, ...patch } : row,
+      ),
+    }))
+
+  const removeAddress = (index: number) =>
+    setForm((current) => ({
+      ...current,
+      addresses: current.addresses.filter((_, i) => i !== index),
+    }))
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput.trim())
@@ -386,7 +420,7 @@ export default function DedicatedPage() {
 
   const openEdit = useCallback((row: DedicatedServerRow) => {
     setEditing(row)
-    setForm(row)
+    setForm({ ...EMPTY, ...row, addresses: row.addresses ?? [] })
     setCustomerQuery("")
     setCustomerHits([])
     setMessage(null)
@@ -432,6 +466,14 @@ export default function DedicatedPage() {
         plan_name: form.plan_name,
         server_specs: form.server_specs,
         services: form.services,
+        addresses: form.addresses
+          .filter((row) => row.address.trim())
+          .map((row) => ({
+            address: row.address.trim(),
+            role: row.role === "node" ? "node" : "server",
+            label: row.label.trim(),
+            is_primary: Boolean(row.is_primary),
+          })),
         notes: form.notes,
         price: toNumber(form.price, 0),
         discount: toNumber(form.discount, 0),
@@ -701,6 +743,14 @@ export default function DedicatedPage() {
                         <div className="mt-0.5 text-[11px] text-slate-400">
                           {row.billing_cycle_display}
                         </div>
+                        {(row.addresses ?? []).filter((item) => item.role === "server").length > 0 && (
+                          <div className="mt-0.5 font-mono text-[10px] text-slate-400" dir="ltr">
+                            {(row.addresses ?? []).filter((item) => item.role === "server")[0].address}
+                            {(row.addresses ?? []).filter((item) => item.role === "server").length > 1
+                              ? ` +${(row.addresses ?? []).filter((item) => item.role === "server").length - 1}`
+                              : ""}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-700" dir="ltr">
                         {money(row.price)}
@@ -1093,6 +1143,83 @@ export default function DedicatedPage() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-slate-800">آی‌پی‌های سرور</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  آی‌پی نود فقط برای مدیریت است و در پنل مشتری جدا از آی‌پی‌های خود سرور
+                  نمایش داده می‌شود.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => addAddress("node")}>
+                  <Plus className="ml-1 h-3.5 w-3.5" />
+                  آی‌پی نود
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => addAddress("server")}>
+                  <Plus className="ml-1 h-3.5 w-3.5" />
+                  آی‌پی سرور
+                </Button>
+              </div>
+            </div>
+
+            {form.addresses.length === 0 ? (
+              <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                هنوز آی‌پی‌ای ثبت نشده است. با دکمه‌های بالا اضافه کنید.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {form.addresses.map((row, index) => (
+                  <div
+                    key={index}
+                    className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-[1fr_9rem_1fr_auto_auto]"
+                  >
+                    <Input
+                      value={row.address}
+                      onChange={(event) => updateAddress(index, { address: event.target.value })}
+                      placeholder="94.182.94.6"
+                      dir="ltr"
+                      className="font-mono"
+                    />
+                    <select
+                      value={row.role}
+                      onChange={(event) => updateAddress(index, { role: event.target.value })}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    >
+                      <option value="server">آی‌پی سرور</option>
+                      <option value="node">آی‌پی نود</option>
+                    </select>
+                    <Input
+                      value={row.label}
+                      onChange={(event) => updateAddress(index, { label: event.target.value })}
+                      placeholder="توضیح (مثلاً IP اصلی یا پهنای‌باند)"
+                    />
+                    <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={row.is_primary}
+                        onChange={(event) => updateAddress(index, { is_primary: event.target.checked })}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      اصلی
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 w-9 px-0"
+                      onClick={() => removeAddress(index)}
+                      aria-label="حذف آی‌پی"
+                    >
+                      <Trash2 className="h-4 w-4 text-rose-500" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
