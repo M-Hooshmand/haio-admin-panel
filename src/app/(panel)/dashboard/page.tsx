@@ -623,22 +623,19 @@ export default function DashboardPage() {
         <>
           {/* Unified KPI panel — one card, divider-separated groups instead of
               eleven separate little boxes. */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-              <div className="flex items-start gap-2">
-                <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
-                  <Activity className="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">خلاصه عملکرد</h3>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    کاربران، پول و عملیات در یک نگاه — همه اعداد فقط مشتریان واقعی را
-                    شامل می‌شود.
-                  </p>
-                </div>
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-start gap-2 border-b border-slate-100 px-4 py-3 md:px-5">
+              <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
+                <Activity className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">خلاصه عملکرد</h3>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  کاربران، پول و عملیات در یک نگاه — فقط مشتریان واقعی.
+                </p>
               </div>
             </div>
-            <div className="grid gap-px overflow-hidden rounded-xl border border-slate-100 bg-slate-100 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="divide-y divide-slate-100">
               <KpiGroup
                 title="کاربران"
                 icon={Users}
@@ -1486,25 +1483,30 @@ function KpiGroup({
   items: { label: string; value: string; hint?: string; tone?: string }[]
 }) {
   return (
-    <div className="bg-white p-4">
-      <div className="flex items-center gap-1.5 text-slate-400">
-        <Icon className="h-3.5 w-3.5" />
+    <div className="grid sm:grid-cols-[8.5rem_minmax(0,1fr)]">
+      <div className="flex items-center gap-1.5 bg-slate-50/70 px-4 py-2 md:px-5">
+        <Icon className="h-3.5 w-3.5 text-slate-400" />
         <h4 className="text-[11px] font-bold text-slate-500">{title}</h4>
       </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-x-5 gap-y-3.5">
+      <div className="grid min-w-0 grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {items.map((item) => (
-          <div key={item.label}>
-            <p className="text-[10px] text-slate-400">{item.label}</p>
+          <div key={item.label} className="min-w-0 px-4 py-2.5">
+            <p className="truncate text-[10px] text-slate-400">{item.label}</p>
             <p
               className={cn(
-                "mt-0.5 text-base font-bold leading-6",
+                "mt-0.5 truncate text-base font-bold leading-6",
                 item.tone ?? "text-slate-900"
               )}
             >
               {item.value}
             </p>
             {item.hint ? (
-              <p className="mt-0.5 text-[10px] leading-4 text-slate-400">{item.hint}</p>
+              <p
+                className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-400"
+                title={item.hint}
+              >
+                {item.hint}
+              </p>
             ) : null}
           </div>
         ))}
