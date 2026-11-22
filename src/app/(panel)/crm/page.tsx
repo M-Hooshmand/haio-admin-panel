@@ -35,7 +35,6 @@ import {
   formatDateTime,
   formatMoney,
   formatNumber,
-  isOverdue,
 } from "./types"
 
 const PAGE_SIZE = 25
@@ -83,67 +82,133 @@ function Empty({ text }: { text: string }) {
   )
 }
 
-function FollowUpCard({
+function CallCard({
   item,
+  rank,
   busy,
   onOpen,
   onSnooze,
 }: {
   item: FollowUp
+  rank: number
   busy: boolean
   onOpen: () => void
   onSnooze: (days: number) => void
 }) {
-  const overdue = isOverdue(item.due_at)
+  const firstTime = item.meta?.first_time === true
+  const isAbandoned = item.kind === "abandoned_invoice"
+  const attempts = Number(item.meta?.attempts ?? item.invoice?.attempts ?? 0)
   return (
     <div
       className={cn(
-        "rounded-2xl border bg-white p-3.5",
-        overdue ? "border-rose-200" : "border-slate-200",
+        "rounded-2xl border bg-white p-4 transition-shadow hover:shadow-sm",
+        isAbandoned && firstTime
+          ? "border-rose-200"
+          : isAbandoned
+            ? "border-amber-200"
+            : "border-slate-200",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
+      <div className="flex gap-3">
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+            isAbandoned && firstTime
+              ? "bg-rose-100 text-rose-700"
+              : isAbandoned
+                ? "bg-amber-100 text-amber-700"
+                : "bg-sky-100 text-sky-700",
+          )}
+        >
+          {formatNumber(rank)}
+        </div>
+
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="text-sm font-bold text-slate-900">{item.customer.display_name}</p>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-              {item.kind_label}
-            </span>
-            {overdue ? (
-              <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700">
-                عقب‌افتاده
+            {isAbandoned ? (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                  firstTime
+                    ? "bg-rose-50 text-rose-700"
+                    : "bg-amber-50 text-amber-700",
+                )}
+              >
+                {firstTime ? "اولین خرید" : "خرید مجدد"}
               </span>
-            ) : null}
+            ) : (
+              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                {item.kind_label}
+              </span>
+            )}
+            {item.customer.mobile ? (
+              <a
+                href={`tel:${item.customer.mobile}`}
+                dir="ltr"
+                className="mr-auto inline-flex items-center gap-1 text-sm font-bold text-indigo-700 hover:underline"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                {item.customer.mobile}
+              </a>
+            ) : (
+              <span className="mr-auto text-[10px] text-rose-600">شماره ندارد</span>
+            )}
           </div>
-          <a
-            href={`tel:${item.customer.mobile}`}
-            dir="ltr"
-            className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:underline"
-          >
-            <Phone className="h-3 w-3" />
-            {item.customer.mobile || "شماره ندارد"}
-          </a>
-          <p className="mt-1.5 text-xs leading-5 text-slate-700">{item.reason}</p>
-          <p className="mt-1 text-[10px] text-slate-500">
-            موعد: {formatDate(item.due_at)}
-            {item.invoice ? ` · ${item.invoice.product} · ${formatMoney(item.invoice.amount)}` : ""}
-            {item.invoice?.attempts ? ` · ${item.invoice.attempts} تلاش پرداخت` : ""}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Button size="sm" variant="outline" className="h-8 gap-1" onClick={onOpen}>
-            <StickyNote className="h-3.5 w-3.5" />
-            پرونده
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-[11px]"
-            disabled={busy}
-            onClick={() => onSnooze(7)}
-          >
-            ۱ هفته
-          </Button>
+
+          {item.invoice ? (
+            <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] sm:grid-cols-4">
+              <div>
+                <p className="text-[10px] text-slate-400">محصول</p>
+                <p className="font-medium text-slate-800">{item.invoice.product}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400">مبلغ</p>
+                <p className="font-medium text-slate-800">{formatMoney(item.invoice.amount)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400">رفتن به درگاه</p>
+                <p className={cn("font-medium", attempts ? "text-rose-700" : "text-slate-500")}>
+                  {attempts ? `${formatNumber(attempts)} بار` : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400">تاریخ فاکتور</p>
+                <p className="font-medium text-slate-800">{formatDate(item.invoice.created_at)}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs leading-5 text-slate-700">{item.reason}</p>
+          )}
+
+          {item.invoice ? (
+            <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-slate-500">{item.reason}</p>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {item.customer.mobile ? (
+              <a
+                href={`tel:${item.customer.mobile}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-[11px] font-medium text-white hover:bg-indigo-700"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                تماس
+              </a>
+            ) : null}
+            <Button size="sm" variant="outline" className="h-8 gap-1" onClick={onOpen}>
+              <StickyNote className="h-3.5 w-3.5" />
+              پرونده و ثبت نتیجه
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-[11px] text-slate-500"
+              disabled={busy}
+              onClick={() => onSnooze(7)}
+            >
+              ۱ هفته بعد
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -360,7 +425,7 @@ export default function CrmPage() {
   const syncNow = async () => {
     setBusy(true)
     try {
-      await api.post("/panel/crm/followups/sync/", { days: 30 })
+      await api.post("/panel/crm/followups/sync/", {})
       await refreshAll()
     } catch (err) {
       setError(extractError(err))
@@ -381,14 +446,18 @@ export default function CrmPage() {
     return dashboard.segments[key] ?? 0
   }
 
+  const today = dashboard?.today ?? []
+  const abandonedCalls = today.filter((item) => item.kind === "abandoned_invoice")
+  const renewalCalls = today.filter((item) => item.kind !== "abandoned_invoice")
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between md:p-5">
         <div>
           <h1 className="text-sm font-bold text-slate-900">پیگیری مشتریان</h1>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            لیست تماس روزانه بر اساس خرید، تمدید، فاکتور رهاشده و تیکت.
-            {dashboard?.generated_at ? ` آخرین به‌روزرسانی: ${formatDateTime(dashboard.generated_at)}` : ""}
+            اولویت تماس: فاکتور رهاشده در درگاه، سپس تمدید. خریداران اول فقط در تب خودشان برای آمار هستند.
+            {dashboard?.generated_at ? ` · آخرین به‌روزرسانی: ${formatDateTime(dashboard.generated_at)}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -478,29 +547,77 @@ export default function CrmPage() {
             </div>
           ) : (
             <>
-              <section className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                    <Phone className="h-4 w-4 text-indigo-600" />
-                    امروز به این افراد زنگ بزن
-                  </h2>
-                  <span className="text-[10px] text-slate-400">
-                    {dashboard?.today.length ?? 0} مورد
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h2 className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                      <Phone className="h-4 w-4 text-indigo-600" />
+                      لیست تماس امروز
+                    </h2>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      فقط اولویت‌ها: اول کسانی که به درگاه رفتند و پول ندادند، بعد تمدیدکننده‌ها.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">
+                    {formatNumber(today.length)} شماره
                   </span>
                 </div>
-                {(dashboard?.today.length ?? 0) === 0 ? (
+
+                {today.length === 0 ? (
                   <Empty text="برای امروز موردی نیست. لیست را دوباره بسازید یا فردا سر بزنید." />
                 ) : (
-                  <div className="grid gap-2 lg:grid-cols-2">
-                    {dashboard?.today.map((item) => (
-                      <FollowUpCard
-                        key={item.id}
-                        item={item}
-                        busy={busy}
-                        onOpen={() => openCustomer(item.customer.id, item.id)}
-                        onSnooze={(days) => void snooze(item, days)}
-                      />
-                    ))}
+                  <div className="space-y-5">
+                    {abandonedCalls.length ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-rose-500" />
+                          <h3 className="text-xs font-bold text-slate-800">
+                            اولویت ۱ — رفتند درگاه و پرداخت نکردند
+                          </h3>
+                          <span className="text-[10px] text-slate-400">
+                            {formatNumber(abandonedCalls.length)} نفر
+                          </span>
+                        </div>
+                        <div className="grid gap-2 xl:grid-cols-2">
+                          {abandonedCalls.map((item, index) => (
+                            <CallCard
+                              key={item.id}
+                              item={item}
+                              rank={index + 1}
+                              busy={busy}
+                              onOpen={() => openCustomer(item.customer.id, item.id)}
+                              onSnooze={(days) => void snooze(item, days)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {renewalCalls.length ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-sky-500" />
+                          <h3 className="text-xs font-bold text-slate-800">
+                            اولویت ۲ — تمدید کرده‌اند (تماس رضایت‌سنجی)
+                          </h3>
+                          <span className="text-[10px] text-slate-400">
+                            {formatNumber(renewalCalls.length)} نفر
+                          </span>
+                        </div>
+                        <div className="grid gap-2 xl:grid-cols-2">
+                          {renewalCalls.map((item, index) => (
+                            <CallCard
+                              key={item.id}
+                              item={item}
+                              rank={abandonedCalls.length + index + 1}
+                              busy={busy}
+                              onOpen={() => openCustomer(item.customer.id, item.id)}
+                              onSnooze={(days) => void snooze(item, days)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </section>
@@ -509,10 +626,13 @@ export default function CrmPage() {
                 <section className="space-y-2">
                   <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                     <CalendarClock className="h-4 w-4 text-slate-500" />
-                    هفتهٔ آینده
+                    یادآوری‌های بعدی
+                    <span className="text-[10px] font-normal text-slate-400">
+                      {formatNumber(dashboard?.upcoming.length ?? 0)} مورد
+                    </span>
                   </h2>
                   <div className="rounded-2xl border border-slate-200 bg-white">
-                    {dashboard?.upcoming.map((item) => (
+                    {dashboard?.upcoming.slice(0, 8).map((item) => (
                       <button
                         key={item.id}
                         type="button"
@@ -559,6 +679,12 @@ export default function CrmPage() {
               {formatNumber(segment?.total ?? 0)} مشتری در این دسته
             </p>
           </div>
+
+          {tab === "first_buyer" ? (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">
+              این دسته فقط برای آمار و شناخت مشتری است؛ فعلاً جزو اولویت تماس امروز نیست.
+            </p>
+          ) : null}
 
           {busy && !segment ? (
             <div className="flex min-h-40 items-center justify-center rounded-2xl border border-slate-200 bg-white">

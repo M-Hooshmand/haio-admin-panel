@@ -191,12 +191,12 @@ export interface CrmMeta {
 }
 
 export const SEGMENT_TABS = [
-  { key: "today", label: "امروز" },
-  { key: "first_buyer", label: "خریدار اول" },
-  { key: "renewer", label: "تمدیدکننده" },
-  { key: "abandoned", label: "فاکتور رهاشده" },
-  { key: "ticketed", label: "تیکت‌دار" },
-  { key: "archive", label: "بایگانی و بعداً" },
+  { key: "today", label: "تماس امروز" },
+  { key: "first_buyer", label: "خریداران" },
+  { key: "renewer", label: "تمدیدکننده‌ها" },
+  { key: "abandoned", label: "رهاشده درگاه" },
+  { key: "ticketed", label: "تیکت‌ها" },
+  { key: "archive", label: "بعداً / بایگانی" },
 ] as const
 
 export type TabKey = (typeof SEGMENT_TABS)[number]["key"]
