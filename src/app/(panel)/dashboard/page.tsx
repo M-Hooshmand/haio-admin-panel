@@ -736,7 +736,7 @@ export default function DashboardPage() {
             subtitle={
               moneyView === "bars"
                 ? "هر ستون یک روز است. موس را روی هر روز ببرید تا مبلغ همان روز به تومان و سهم درگاه، کیف پول و کارت‌به‌کارت را ببینید. برای مقایسه روزها بازه ۷ یا ۳۰ روزه را انتخاب کنید."
-                : "هر نقطه یک روز است؛ خط مجموع روند کلی را نشان می‌دهد و سه خط دیگر سهم درگاه، کیف پول و کارت‌به‌کارت هستند. موس را روی هر روز ببرید تا مبلغ آن روز به تومان دیده شود."
+                : "روند ورودی کل؛ هر نقطه یک روز است و بالا و پایین رفتن خط رشد و افت را نشان می‌دهد. موس را روی هر روز ببرید تا مبلغ آن روز به تومان دیده شود. برای دیدن سهم درگاه، کیف پول و کارت‌به‌کارت نمای ستونی را انتخاب کنید."
             }
             icon={CircleDollarSign}
             action={
@@ -756,7 +756,15 @@ export default function DashboardPage() {
                     ستونی
                   </button>
                   <button
-                    onClick={() => setMoneyView("line")}
+                    onClick={() => {
+                      setMoneyView("line")
+                      // A single day cannot show a trend line, so jump to a
+                      // range with real up/down movement.
+                      if (days === 1) {
+                        setDays(30)
+                        setOffset(0)
+                      }
+                    }}
                     aria-pressed={moneyView === "line"}
                     className={cn(
                       "flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition",
@@ -858,13 +866,12 @@ export default function DashboardPage() {
                 labels={dailyInflow.map((row) => row.date)}
                 bands={bands}
                 series={[
-                  ...inflowSeries,
                   {
                     key: "total",
-                    label: "مجموع",
-                    color: "#334155",
+                    label: "ورودی کل",
+                    color: "#6366f1",
                     values: dailyInflow.map((row) => row.total),
-                    dashed: true,
+                    type: "area",
                   },
                 ]}
                 formatValue={faToman}
