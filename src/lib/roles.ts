@@ -109,6 +109,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "SALES", "FINANCE"],
   },
   {
+    key: "crm",
+    href: "/crm",
+    title: "پیگیری مشتریان",
+    description: "دسته‌بندی مشتریان، تماس‌های امروز، شرح حال و یادآوری",
+    roles: ["MANAGER", "OFFICE", "SALES"],
+  },
+  {
     key: "organizations",
     href: "/organizations",
     title: "سازمان‌ها",
@@ -162,6 +169,13 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/monitoring",
     title: "مونیتورینگ کاربران",
     description: "کاربران آنلاین و فعال امروز",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+  },
+  {
+    key: "alerts",
+    href: "/alerts",
+    title: "هشدارهای سیستم",
+    description: "خطاهای ساعتی لاگ‌ها: ۵۰۲، خطای درگاه، سلری و سرویس‌های خواب‌رفته",
     roles: ["MANAGER", "OFFICE", "TECHNICAL"],
   },
   {
