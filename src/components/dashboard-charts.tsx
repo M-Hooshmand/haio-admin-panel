@@ -517,7 +517,7 @@ export function StackedBarChart({
   const plotW = width - pad.left - pad.right
   const plotH = height - pad.top - pad.bottom
   const step = plotW / Math.max(1, labels.length)
-  const barW = Math.max(3, step * 0.62)
+  const barW = Math.max(3, Math.min(56, step * 0.62))
   const x = (i: number) => pad.left + i * step + step / 2
   const y = (v: number) => pad.top + (1 - v / max) * plotH
 

@@ -3,19 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Activity,
-  ArrowLeft,
-  BadgeCheck,
   CircleDollarSign,
   CircleDashed,
-  Globe2,
   Megaphone,
   ReceiptText,
   RefreshCw,
   Server,
   ShieldCheck,
   Ticket,
-  TrendingUp,
-  UserPlus,
   Users,
 } from "lucide-react"
 import { api } from "@/lib/api"
@@ -256,6 +251,9 @@ const RANGES: { days: number; offset: number; label: string }[] = [
   { days: 90, offset: 0, label: "۹۰ روز" },
   { days: 180, offset: 0, label: "۱۸۰ روز" },
 ]
+// Quick range shortcuts shown on the money chart itself, so a 7- or 30-day
+// day-by-day comparison does not require scrolling back to the page header.
+const QUICK_RANGES = [7, 30, 90]
 const CHANNEL_LABELS: Record<string, string> = {
   email: "ایمیل",
   bale: "بله",
@@ -393,9 +391,39 @@ export default function DashboardPage() {
       ? data?.revenue_by_product ?? []
       : data?.revenue_by_product_monthly.find((row) => row.month === activeMonth)?.products ?? []
 
-  const cdnRevenue = data?.revenue_by_product.find((row) => row.key === "cdn")
-  const cdnService = data?.services.find((row) => row.key === "cdn")
-  const cdnProducts = data?.products.find((row) => row.key === "cdn")
+  // Daily money inflow split by the three real sources (gateway, wallet,
+  // card-to-card). Every product row carries all three buckets, so summing
+  // across products gives exactly the inflow figure shown in the KPI panel.
+  const dailyInflow = useMemo(() => {
+    const rows = data?.revenue_by_product_daily ?? []
+    return rows.map((row) => {
+      let gateway = 0
+      let wallet = 0
+      let manual = 0
+      for (const product of row.products ?? []) {
+        gateway += product.gateway_amount ?? 0
+        wallet += product.wallet_amount ?? 0
+        manual += product.manual_amount ?? 0
+      }
+      return { date: row.date, gateway, wallet, manual, total: gateway + wallet + manual }
+    })
+  }, [data])
+
+  const inflowSummary = useMemo(() => {
+    if (!dailyInflow.length) return null
+    const total = dailyInflow.reduce((sum, row) => sum + row.total, 0)
+    let best = dailyInflow[0]
+    for (const row of dailyInflow) {
+      if (row.total > best.total) best = row
+    }
+    const last = dailyInflow[dailyInflow.length - 1]
+    const previous = dailyInflow.length > 1 ? dailyInflow[dailyInflow.length - 2] : null
+    const delta =
+      previous && previous.total > 0
+        ? Math.round(((last.total - previous.total) / previous.total) * 1000) / 10
+        : null
+    return { total, average: total / dailyInflow.length, best, last, delta }
+  }, [dailyInflow])
 
   const dailyProductSeries = useMemo(() => {
     const rows = data?.revenue_by_product_daily ?? []
@@ -486,6 +514,11 @@ export default function DashboardPage() {
     return { previous, pct }
   }, [data])
 
+  // For a single-day view the chart has no previous column, so reuse the KPI's
+  // day-over-day comparison for the «آخرین روز» figure.
+  const moneyTrendPct =
+    inflowSummary?.delta ?? (days === 1 ? inflowDelta?.pct ?? null : null)
+
   const displayName =
     user?.display_name ||
     [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
@@ -560,208 +593,225 @@ export default function DashboardPage() {
 
       {data ? (
         <>
-          {/* KPIs */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard
-              title={
-                days === 1
-                  ? offset === 1
-                    ? "ثبت‌نام دیروز"
-                    : "ثبت‌نام امروز"
-                  : `ثبت‌نام ${faNum(days)} روز`
-              }
-              value={faNum(data.kpis.signups)}
-              hint={`${faNum(data.kpis.verified)} احراز هویت · نرخ ${faNum(data.kpis.verification_rate)}٪`}
-              icon={UserPlus}
-              tone="text-indigo-600"
-            />
-            <KpiCard
-              title="ورودی مالی (درگاه + کیف پول + کارت‌به‌کارت)"
-              value={tomanCompact(data.kpis.inflow_amount)}
-              hint={`درگاه: ${tomanCompact(data.kpis.gateway_inflow_amount)} · کیف پول: ${tomanCompact(
-                data.kpis.wallet_inflow_amount
-              )}${
-                (data.kpis.manual_inflow_amount ?? 0) > 0
-                  ? ` · کارت‌به‌کارت: ${tomanCompact(data.kpis.manual_inflow_amount ?? 0)}`
-                  : ""
-              }${
-                days === 1 && inflowDelta
-                  ? ` · ${offset === 1 ? "روز قبل" : "دیروز"}: ${tomanCompact(
-                      inflowDelta.previous
-                    )} (${inflowDelta.pct >= 0 ? "+" : ""}${faNum(inflowDelta.pct)}٪)`
-                  : ""
-              }`}
-              icon={CircleDollarSign}
-              tone="text-emerald-600"
-            />
-            <KpiCard
-              title="فاکتور در انتظار"
-              value={faNum(data.kpis.pending_count)}
-              hint={tomanCompact(data.kpis.pending_amount)}
-              icon={ReceiptText}
-              tone="text-amber-600"
-            />
-            <KpiCard
-              title="ورود امروز به پنل"
-              value={faNum(data.kpis.logins_today)}
-              hint={`${faNum(data.kpis.users_today)} کاربر یکتا`}
-              icon={Activity}
-              tone="text-sky-600"
-            />
-            <KpiCard
-              title="بازدید امروز از پنل"
-              value={faNum(data.kpis.page_views_today ?? 0)}
-              hint={`${faNum(data.kpis.page_view_users_today ?? 0)} کاربر یکتا`}
-              icon={Activity}
-              tone="text-cyan-600"
-            />
-            <KpiCard
-              title="تیکت باز"
-              value={faNum(data.kpis.open_tickets)}
-              hint={`${faNum(data.tickets.total)} تیکت در بازه`}
-              icon={Ticket}
-              tone="text-rose-600"
-            />
-            <KpiCard
-              title="نرخ تبدیل فاکتور"
-              value={`${faNum(data.invoices.conversion_rate)}٪`}
-              hint={`${faNum(data.invoices.paid.count)} پرداخت از ${faNum(data.invoices.issued.count)} فاکتور`}
-              icon={TrendingUp}
-              tone="text-violet-600"
-            />
-            <KpiCard
-              title="کمپین‌های بازه"
-              value={faNum(activeCampaigns.length)}
-              hint={`${faNum(data.campaign_days.length)} روز ارسال · ${faNum(campaignEngagement.uniqueOpens)} باز‌شدن یکتا · ${faNum(campaignEngagement.uniqueClicks)} کلیک یکتا`}
-              icon={Megaphone}
-              tone="text-fuchsia-600"
-            />
-            <KpiCard
-              title="احراز هویت‌شده"
-              value={faNum(data.kpis.verified)}
-              hint={`نرخ احراز ${faNum(data.kpis.verification_rate)}٪`}
-              icon={BadgeCheck}
-              tone="text-teal-600"
-            />
-            <KpiCard
-              title="سرویس فعال مشتریان"
-              value={faNum(data.kpis.active_services)}
-              hint="پاس، فلش، تحریم‌شکن، دسکتاپ و CDN"
-              icon={Server}
-              tone="text-cyan-600"
-            />
-            <KpiCard
-              title="سرویس‌های ادمین‌ها"
-              value={faNum(data.kpis.admin_services)}
-              hint={`${faNum(data.admin_services.active)} سرویس فعال`}
-              icon={ShieldCheck}
-              tone="text-slate-600"
-            />
-          </div>
+          {/* Unified KPI panel — one card, divider-separated groups instead of
+              eleven separate little boxes. */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
+                  <Activity className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">خلاصه عملکرد</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    کاربران، پول و عملیات در یک نگاه — همه اعداد فقط مشتریان واقعی را
+                    شامل می‌شود.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-px overflow-hidden rounded-xl border border-slate-100 bg-slate-100 sm:grid-cols-2 xl:grid-cols-3">
+              <KpiGroup
+                title="کاربران"
+                icon={Users}
+                items={[
+                  {
+                    label:
+                      days === 1
+                        ? offset === 1
+                          ? "ثبت‌نام دیروز"
+                          : "ثبت‌نام امروز"
+                        : `ثبت‌نام ${faNum(days)} روز`,
+                    value: faNum(data.kpis.signups),
+                    hint: `${faNum(data.kpis.verified)} احراز هویت · نرخ ${faNum(data.kpis.verification_rate)}٪`,
+                    tone: "text-indigo-600",
+                  },
+                  {
+                    label: "ورود امروز به پنل",
+                    value: faNum(data.kpis.logins_today),
+                    hint: `${faNum(data.kpis.users_today)} کاربر یکتا`,
+                    tone: "text-sky-600",
+                  },
+                  {
+                    label: "بازدید امروز از پنل",
+                    value: faNum(data.kpis.page_views_today ?? 0),
+                    hint: `${faNum(data.kpis.page_view_users_today ?? 0)} کاربر یکتا`,
+                    tone: "text-cyan-600",
+                  },
+                ]}
+              />
+              <KpiGroup
+                title="مالی"
+                icon={CircleDollarSign}
+                items={[
+                  {
+                    label: "ورودی مالی",
+                    value: tomanCompact(data.kpis.inflow_amount),
+                    hint: `درگاه ${tomanCompact(data.kpis.gateway_inflow_amount)} · کیف پول ${tomanCompact(
+                      data.kpis.wallet_inflow_amount
+                    )}${
+                      (data.kpis.manual_inflow_amount ?? 0) > 0
+                        ? ` · کارت‌به‌کارت ${tomanCompact(data.kpis.manual_inflow_amount ?? 0)}`
+                        : ""
+                    }`,
+                    tone: "text-emerald-600",
+                  },
+                  {
+                    label: "فاکتور در انتظار",
+                    value: faNum(data.kpis.pending_count),
+                    hint: tomanCompact(data.kpis.pending_amount),
+                    tone: "text-amber-600",
+                  },
+                  {
+                    label: "نرخ تبدیل فاکتور",
+                    value: `${faNum(data.invoices.conversion_rate)}٪`,
+                    hint: `${faNum(data.invoices.paid.count)} پرداخت از ${faNum(data.invoices.issued.count)} فاکتور`,
+                    tone: "text-violet-600",
+                  },
+                ]}
+              />
+              <KpiGroup
+                title="عملیات و پشتیبانی"
+                icon={Server}
+                items={[
+                  {
+                    label: "تیکت باز",
+                    value: faNum(data.kpis.open_tickets),
+                    hint: `${faNum(data.tickets.total)} تیکت در بازه`,
+                    tone: "text-rose-600",
+                  },
+                  {
+                    label: "سرویس فعال مشتریان",
+                    value: faNum(data.kpis.active_services),
+                    hint: `ادمین‌ها: ${faNum(data.kpis.admin_services)} سرویس (${faNum(
+                      data.admin_services.active
+                    )} فعال)`,
+                    tone: "text-cyan-600",
+                  },
+                  {
+                    label: "کمپین‌های بازه",
+                    value: faNum(activeCampaigns.length),
+                    hint: `${faNum(data.campaign_days.length)} روز ارسال · ${faNum(
+                      campaignEngagement.uniqueOpens
+                    )} باز‌شدن · ${faNum(campaignEngagement.uniqueClicks)} کلیک یکتا`,
+                    tone: "text-fuchsia-600",
+                  },
+                ]}
+              />
+            </div>
+          </section>
 
           {/* Team task activity — GitHub-style contribution graph */}
           <TaskHeatmap />
 
-          {/* CDN product highlight */}
-          <section className="rounded-2xl border border-pink-200 bg-gradient-to-l from-pink-50 via-white to-white p-4 md:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
-                <span className="rounded-lg bg-pink-100 p-1.5 text-pink-600">
-                  <Globe2 className="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">CDN</h3>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    درآمد و سرویس‌های محصول CDN در بازه انتخاب‌شده
-                  </p>
-                </div>
-              </div>
-              <a
-                href="/cdn"
-                className="flex items-center gap-1 rounded-lg border border-pink-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-pink-700 transition-colors hover:bg-pink-50"
-              >
-                مشاهده تب CDN
-                <ArrowLeft className="h-3.5 w-3.5" />
-              </a>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
-                <p className="text-[10px] text-slate-400">درآمد بازه</p>
-                <p className="mt-1 text-lg font-bold text-pink-600">
-                  {tomanCompact(cdnRevenue?.amount ?? 0)}
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  {faNum(cdnRevenue?.count ?? 0)} فاکتور پرداخت‌شده
-                </p>
-              </div>
-              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
-                <p className="text-[10px] text-slate-400">سرویس فعال</p>
-                <p className="mt-1 text-lg font-bold text-slate-800">
-                  {faNum(cdnService?.active ?? 0)}
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  از {faNum(cdnService?.total ?? 0)} اشتراک
-                </p>
-              </div>
-              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
-                <p className="text-[10px] text-slate-400">محصول جدید در بازه</p>
-                <p className="mt-1 text-lg font-bold text-slate-800">
-                  {faNum(cdnProducts?.daily.reduce((sum, row) => sum + row.count, 0) ?? 0)}
-                </p>
-                <p className="text-[10px] text-slate-400">اشتراک تازه</p>
-              </div>
-              <div className="rounded-xl border border-pink-100 bg-white/70 p-3">
-                <p className="text-[10px] text-slate-400">سهم از درآمد محصولات</p>
-                <p className="mt-1 text-lg font-bold text-slate-800">
-                  {faNum(
-                    Math.round(
-                      ((cdnRevenue?.amount ?? 0) /
-                        Math.max(
-                          1,
-                          data.revenue_by_product.reduce((sum, row) => sum + row.amount, 0)
-                        )) *
-                        100
-                    )
-                  )}
-                  ٪
-                </p>
-                <p className="text-[10px] text-slate-400">در بازه انتخاب‌شده</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Inflow by fixed period */}
+          {/* Daily money inflow — the old six-box period grid is now one chart
+              where every column is a day and hovering shows that day in toman. */}
           <ChartCard
-            title="ورودی مالی در بازه‌های مختلف"
-            subtitle="همان پول واقعی (درگاه + کیف پول + دریافت مستقیم سرور اختصاصی) در بازه‌های ثابت، مستقل از انتخاب بازه نمودارها. فقط مشتریان واقعی؛ ولت و فاکتور ادمین‌ها حذف شده است."
+            title="ورودی مالی روزانه"
+            subtitle="هر ستون یک روز است. موس را روی هر روز ببرید تا مبلغ همان روز به تومان و سهم درگاه، کیف پول و کارت‌به‌کارت را ببینید. برای مقایسه روزها بازه ۷ یا ۳۰ روزه را انتخاب کنید."
             icon={CircleDollarSign}
+            action={
+              <div className="flex rounded-lg bg-slate-100 p-1 text-[11px]">
+                {QUICK_RANGES.map((rangeDays) => (
+                  <button
+                    key={rangeDays}
+                    onClick={() => {
+                      setDays(rangeDays)
+                      setOffset(0)
+                    }}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 font-medium transition",
+                      days === rangeDays && offset === 0
+                        ? "bg-white text-slate-800 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    {faNum(rangeDays)} روز
+                  </button>
+                ))}
+              </div>
+            }
           >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              {(data.inflow_periods ?? []).map((period) => (
-                <div
-                  key={period.key}
-                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
-                >
-                  <div className="text-xs font-medium text-slate-500">
-                    {period.key === "1d"
-                      ? offset === 0
-                        ? `امروز (${faDay(data.range.to)})`
-                        : "امروز"
-                      : period.label}
-                  </div>
-                  <div className="mt-1 text-lg font-bold text-slate-800">
-                    {tomanCompact(period.amount)}
-                  </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    درگاه {tomanCompact(period.gateway_amount)} · کیف پول{" "}
-                    {tomanCompact(period.wallet_amount)}
-                    {(period.manual_amount ?? 0) > 0
-                      ? ` · کارت‌به‌کارت ${tomanCompact(period.manual_amount ?? 0)}`
-                      : ""}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {inflowSummary ? (
+              <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-slate-50 px-4 py-3">
+                {dailyInflow.length > 1 ? (
+                  <>
+                    <MoneySummary label="جمع بازه" value={tomanCompact(inflowSummary.total)} />
+                    <MoneySummary label="میانگین روزانه" value={tomanCompact(inflowSummary.average)} />
+                    <MoneySummary
+                      label="اوج روز"
+                      value={`${faDay(inflowSummary.best.date)} · ${tomanCompact(
+                        inflowSummary.best.total
+                      )}`}
+                    />
+                    <MoneySummary
+                      label="آخرین روز"
+                      value={`${tomanCompact(inflowSummary.last.total)}${
+                        moneyTrendPct === null
+                          ? ""
+                          : ` (${moneyTrendPct >= 0 ? "+" : ""}${faNum(moneyTrendPct)}٪)`
+                      }`}
+                      tone={
+                        moneyTrendPct === null
+                          ? undefined
+                          : moneyTrendPct >= 0
+                            ? "text-emerald-600"
+                            : "text-rose-600"
+                      }
+                    />
+                  </>
+                ) : (
+                  <>
+                    <MoneySummary
+                      label={offset === 1 ? "ورودی دیروز" : "ورودی امروز"}
+                      value={tomanCompact(inflowSummary.last.total)}
+                      tone="text-emerald-600"
+                    />
+                    <MoneySummary
+                      label="تغییر نسبت به روز قبل"
+                      value={
+                        moneyTrendPct === null
+                          ? "—"
+                          : `${moneyTrendPct >= 0 ? "+" : ""}${faNum(moneyTrendPct)}٪`
+                      }
+                      tone={
+                        moneyTrendPct === null
+                          ? undefined
+                          : moneyTrendPct >= 0
+                            ? "text-emerald-600"
+                            : "text-rose-600"
+                      }
+                    />
+                  </>
+                )}
+              </div>
+            ) : null}
+            <StackedBarChart
+              labels={dailyInflow.map((row) => row.date)}
+              bands={bands}
+              series={[
+                {
+                  key: "gateway",
+                  label: "درگاه",
+                  color: "#10b981",
+                  values: dailyInflow.map((row) => row.gateway),
+                },
+                {
+                  key: "wallet",
+                  label: "کیف پول",
+                  color: "#6366f1",
+                  values: dailyInflow.map((row) => row.wallet),
+                },
+                {
+                  key: "manual",
+                  label: "کارت‌به‌کارت",
+                  color: "#f59e0b",
+                  values: dailyInflow.map((row) => row.manual),
+                },
+              ]}
+              formatValue={faToman}
+              height={280}
+            />
           </ChartCard>
 
           {/* Inflow split: product + purpose, gateway vs wallet */}
@@ -949,7 +999,7 @@ export default function DashboardPage() {
                   },
                 ]}
               />
-              <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-100 bg-slate-100 text-[11px] sm:grid-cols-4">
                 <MiniStat
                   label="در انتظار بدون تلاش"
                   value={faNum(data.invoices.pending_untouched.count)}
@@ -1364,27 +1414,56 @@ export default function DashboardPage() {
   )
 }
 
-function KpiCard({
+function KpiGroup({
   title,
-  value,
-  hint,
   icon: Icon,
-  tone,
+  items,
 }: {
   title: string
-  value: string
-  hint: string
   icon: React.ComponentType<{ className?: string }>
-  tone: string
+  items: { label: string; value: string; hint?: string; tone?: string }[]
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] text-slate-500">{title}</p>
-        <Icon className={cn("h-4 w-4", tone)} />
+    <div className="bg-white p-4">
+      <div className="flex items-center gap-1.5 text-slate-400">
+        <Icon className="h-3.5 w-3.5" />
+        <h4 className="text-[11px] font-bold text-slate-500">{title}</h4>
       </div>
-      <p className="mt-2 text-xl font-bold text-slate-900">{value}</p>
-      <p className="mt-1 text-[10px] text-slate-400">{hint}</p>
+      <div className="mt-2.5 grid grid-cols-2 gap-x-5 gap-y-3.5">
+        {items.map((item) => (
+          <div key={item.label}>
+            <p className="text-[10px] text-slate-400">{item.label}</p>
+            <p
+              className={cn(
+                "mt-0.5 text-base font-bold leading-6",
+                item.tone ?? "text-slate-900"
+              )}
+            >
+              {item.value}
+            </p>
+            {item.hint ? (
+              <p className="mt-0.5 text-[10px] leading-4 text-slate-400">{item.hint}</p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MoneySummary({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone?: string
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] text-slate-400">{label}</p>
+      <p className={cn("mt-0.5 text-sm font-bold", tone ?? "text-slate-900")}>{value}</p>
     </div>
   )
 }
@@ -1395,23 +1474,28 @@ function ChartCard({
   icon: Icon,
   children,
   className,
+  action,
 }: {
   title: string
   subtitle: string
   icon: React.ComponentType<{ className?: string }>
   children: React.ReactNode
   className?: string
+  action?: React.ReactNode
 }) {
   return (
     <section className={cn("rounded-2xl border border-slate-200 bg-white p-4 md:p-5", className)}>
-      <div className="mb-4 flex items-start gap-2">
-        <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
-          <Icon className="h-4 w-4" />
-        </span>
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500">{subtitle}</p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-2">
+          <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
+            <Icon className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">{subtitle}</p>
+          </div>
         </div>
+        {action}
       </div>
       {children}
     </section>
@@ -1430,7 +1514,7 @@ function MiniStat({
   tone: string
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-2.5">
+    <div className="bg-white px-3 py-2">
       <p className="text-[10px] text-slate-500">{label}</p>
       <p className={cn("mt-1 text-sm font-bold", tone)}>{value}</p>
       <p className="mt-0.5 text-[9px] text-slate-400">{hint}</p>
