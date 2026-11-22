@@ -102,7 +102,7 @@ export function TimeSeriesChart({
   className?: string
 }) {
   const width = 860
-  const pad = { left: 48, right: 14, top: 14, bottom: 28 }
+  const pad = { left: 62, right: 14, top: 14, bottom: 28 }
   const { index, setIndex, onMove } = useHoverIndex(labels.length)
 
   const max = useMemo(
@@ -111,7 +111,7 @@ export function TimeSeriesChart({
   )
   const plotW = width - pad.left - pad.right
   const plotH = height - pad.top - pad.bottom
-  const x = (i: number) => pad.left + (labels.length <= 1 ? 0 : (i / (labels.length - 1)) * plotW)
+  const x = (i: number) => pad.left + (labels.length <= 1 ? plotW / 2 : (i / (labels.length - 1)) * plotW)
   const y = (v: number) => pad.top + (1 - v / max) * plotH
 
   const xLabelIndices = useMemo(() => {
@@ -192,6 +192,18 @@ export function TimeSeriesChart({
             </g>
           )
         })}
+
+        {labels.length === 1
+          ? series.map((s) => (
+              <circle
+                key={`point-${s.key}`}
+                cx={x(0)}
+                cy={y(s.values[0] ?? 0)}
+                r={3.5}
+                fill={s.color}
+              />
+            ))
+          : null}
 
         {index !== null ? (
           <g>

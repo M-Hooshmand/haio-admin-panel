@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Activity,
+  BarChart3,
   CircleDollarSign,
   CircleDashed,
+  LineChart,
   Megaphone,
   ReceiptText,
   RefreshCw,
@@ -23,6 +25,7 @@ import {
   GroupedBarChart,
   HBarList,
   StackedBarChart,
+  TimeSeriesChart,
   faCompact,
   faDay,
   faMonth,
@@ -297,6 +300,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [revenueMode, setRevenueMode] = useState<"daily" | "monthly">("daily")
   const [productMonth, setProductMonth] = useState<string>("latest")
+  const [moneyView, setMoneyView] = useState<"bars" | "line">("bars")
 
   const load = useCallback(
     async (silent = false) => {
@@ -519,6 +523,30 @@ export default function DashboardPage() {
   const moneyTrendPct =
     inflowSummary?.delta ?? (days === 1 ? inflowDelta?.pct ?? null : null)
 
+  const inflowSeries = useMemo(
+    () => [
+      {
+        key: "gateway",
+        label: "درگاه",
+        color: "#10b981",
+        values: dailyInflow.map((row) => row.gateway),
+      },
+      {
+        key: "wallet",
+        label: "کیف پول",
+        color: "#6366f1",
+        values: dailyInflow.map((row) => row.wallet),
+      },
+      {
+        key: "manual",
+        label: "کارت‌به‌کارت",
+        color: "#f59e0b",
+        values: dailyInflow.map((row) => row.manual),
+      },
+    ],
+    [dailyInflow]
+  )
+
   const displayName =
     user?.display_name ||
     [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
@@ -708,27 +736,61 @@ export default function DashboardPage() {
               where every column is a day and hovering shows that day in toman. */}
           <ChartCard
             title="ورودی مالی روزانه"
-            subtitle="هر ستون یک روز است. موس را روی هر روز ببرید تا مبلغ همان روز به تومان و سهم درگاه، کیف پول و کارت‌به‌کارت را ببینید. برای مقایسه روزها بازه ۷ یا ۳۰ روزه را انتخاب کنید."
+            subtitle={
+              moneyView === "bars"
+                ? "هر ستون یک روز است. موس را روی هر روز ببرید تا مبلغ همان روز به تومان و سهم درگاه، کیف پول و کارت‌به‌کارت را ببینید. برای مقایسه روزها بازه ۷ یا ۳۰ روزه را انتخاب کنید."
+                : "هر نقطه یک روز است؛ خط مجموع روند کلی را نشان می‌دهد و سه خط دیگر سهم درگاه، کیف پول و کارت‌به‌کارت هستند. موس را روی هر روز ببرید تا مبلغ آن روز به تومان دیده شود."
+            }
             icon={CircleDollarSign}
             action={
-              <div className="flex rounded-lg bg-slate-100 p-1 text-[11px]">
-                {QUICK_RANGES.map((rangeDays) => (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex rounded-lg bg-slate-100 p-1 text-[11px]">
                   <button
-                    key={rangeDays}
-                    onClick={() => {
-                      setDays(rangeDays)
-                      setOffset(0)
-                    }}
+                    onClick={() => setMoneyView("bars")}
+                    aria-pressed={moneyView === "bars"}
                     className={cn(
-                      "rounded-md px-2.5 py-1 font-medium transition",
-                      days === rangeDays && offset === 0
+                      "flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition",
+                      moneyView === "bars"
                         ? "bg-white text-slate-800 shadow-sm"
                         : "text-slate-500 hover:text-slate-700"
                     )}
                   >
-                    {faNum(rangeDays)} روز
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    ستونی
                   </button>
-                ))}
+                  <button
+                    onClick={() => setMoneyView("line")}
+                    aria-pressed={moneyView === "line"}
+                    className={cn(
+                      "flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition",
+                      moneyView === "line"
+                        ? "bg-white text-slate-800 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    <LineChart className="h-3.5 w-3.5" />
+                    خطی
+                  </button>
+                </div>
+                <div className="flex rounded-lg bg-slate-100 p-1 text-[11px]">
+                  {QUICK_RANGES.map((rangeDays) => (
+                    <button
+                      key={rangeDays}
+                      onClick={() => {
+                        setDays(rangeDays)
+                        setOffset(0)
+                      }}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 font-medium transition",
+                        days === rangeDays && offset === 0
+                          ? "bg-white text-slate-800 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      {faNum(rangeDays)} روز
+                    </button>
+                  ))}
+                </div>
               </div>
             }
           >
@@ -786,32 +848,32 @@ export default function DashboardPage() {
                 )}
               </div>
             ) : null}
-            <StackedBarChart
-              labels={dailyInflow.map((row) => row.date)}
-              bands={bands}
-              series={[
-                {
-                  key: "gateway",
-                  label: "درگاه",
-                  color: "#10b981",
-                  values: dailyInflow.map((row) => row.gateway),
-                },
-                {
-                  key: "wallet",
-                  label: "کیف پول",
-                  color: "#6366f1",
-                  values: dailyInflow.map((row) => row.wallet),
-                },
-                {
-                  key: "manual",
-                  label: "کارت‌به‌کارت",
-                  color: "#f59e0b",
-                  values: dailyInflow.map((row) => row.manual),
-                },
-              ]}
-              formatValue={faToman}
-              height={280}
-            />
+            {moneyView === "bars" ? (
+              <StackedBarChart
+                labels={dailyInflow.map((row) => row.date)}
+                bands={bands}
+                series={inflowSeries}
+                formatValue={faToman}
+                height={280}
+              />
+            ) : (
+              <TimeSeriesChart
+                labels={dailyInflow.map((row) => row.date)}
+                bands={bands}
+                series={[
+                  ...inflowSeries,
+                  {
+                    key: "total",
+                    label: "مجموع",
+                    color: "#334155",
+                    values: dailyInflow.map((row) => row.total),
+                    dashed: true,
+                  },
+                ]}
+                formatValue={faToman}
+                height={280}
+              />
+            )}
           </ChartCard>
 
           {/* Inflow split: product + purpose, gateway vs wallet */}
