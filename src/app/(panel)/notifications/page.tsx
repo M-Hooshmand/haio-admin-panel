@@ -84,6 +84,9 @@ interface Summary {
 const PRODUCT_OPTIONS = [
   { value: "haioflash", label: "هایوفلش" },
   { value: "wordpress", label: "وردپرس" },
+  { value: "haiogate", label: "هایوگیت" },
+  { value: "android", label: "اندروید ابری" },
+  { value: "dedicated", label: "سرور اختصاصی" },
   { value: "other", label: "سایر محصولات" },
 ]
 
