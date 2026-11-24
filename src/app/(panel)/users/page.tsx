@@ -26,7 +26,9 @@ import {
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { isoToJalaliText, jalaliTextToIso, normalizeDigits, todayIso } from "@/lib/jalali"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/stores/auth-store"
 
 type VerificationLevel = "full" | "partial" | "none"
 
@@ -90,6 +92,7 @@ interface CustomerDetail {
     name: string
     slug: string
     role: string
+    wallet_id: number | null
     wallet_balance: number
     created_at: string
   }[]
@@ -140,6 +143,17 @@ interface CustomerDetail {
     organization: string
     plan: string | null
   }[]
+  wallet_charges: {
+    id: string
+    organization_id: number
+    organization: string
+    amount: number
+    balance_after: number
+    note: string
+    created_at: string | null
+    created_by: string
+  }[]
+  wallet_charge_allowed: boolean
 }
 
 const PAGE_SIZE = 25
@@ -767,6 +781,10 @@ export default function UsersPage() {
           onClose={() => setSelected(null)}
           onImpersonate={impersonate}
           impersonating={impersonatingId === selected.id}
+          onChanged={() => {
+            void fetchRows()
+            void fetchMeta()
+          }}
         />
       ) : null}
     </div>
@@ -839,35 +857,39 @@ function CustomerDrawer({
   onClose,
   onImpersonate,
   impersonating,
+  onChanged,
 }: {
   customer: CustomerRow
   onClose: () => void
   onImpersonate: (row: CustomerRow) => void
   impersonating: boolean
+  onChanged: () => void
 }) {
   const [detail, setDetail] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [charging, setCharging] = useState(false)
+  const [notice, setNotice] = useState("")
 
-  useEffect(() => {
-    let alive = true
+  const role = useAuthStore((state) => state.role)
+  const canCharge = role === "MANAGER" || role === "FINANCE"
+
+  const loadDetail = useCallback(async () => {
     setLoading(true)
     setError("")
-    api
-      .get<CustomerDetail>(`/panel/customers/${customer.id}/`)
-      .then(({ data }) => {
-        if (alive) setDetail(data)
-      })
-      .catch((err) => {
-        if (alive) setError(extractError(err))
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
+    try {
+      const { data } = await api.get<CustomerDetail>(`/panel/customers/${customer.id}/`)
+      setDetail(data)
+    } catch (err) {
+      setError(extractError(err))
+    } finally {
+      setLoading(false)
     }
   }, [customer.id])
+
+  useEffect(() => {
+    void loadDetail()
+  }, [loadDetail])
 
   const data = detail?.customer ?? customer
 
@@ -907,6 +929,20 @@ function CustomerDrawer({
               )}
               ورود به پنل کاربر
             </Button>
+            {canCharge ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-violet-200 text-violet-700 hover:bg-violet-50"
+                onClick={() => {
+                  setNotice("")
+                  setCharging(true)
+                }}
+              >
+                <Wallet className="h-4 w-4" />
+                شارژ کیف پول
+              </Button>
+            ) : null}
             <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
               <X className="h-5 w-5" />
             </button>
@@ -916,6 +952,12 @@ function CustomerDrawer({
         <div className="flex-1 space-y-4 overflow-y-auto p-4 scrollbar-thin">
           {error ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>
+          ) : null}
+
+          {notice ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              {notice}
+            </div>
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1065,6 +1107,45 @@ function CustomerDrawer({
                 )}
               </SectionCard>
 
+              {canCharge ? (
+                <SectionCard
+                  title="تاریخچه شارژ کیف پول"
+                  count={detail.wallet_charges.length}
+                  icon={Wallet}
+                >
+                  {detail.wallet_charges.length === 0 ? (
+                    <Empty text="شارژ دستی ثبت نشده است." />
+                  ) : (
+                    <div className="space-y-2">
+                      {detail.wallet_charges.map((charge) => (
+                        <div
+                          key={charge.id}
+                          className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800">{charge.note || "—"}</p>
+                            <p className="text-[11px] text-slate-400">
+                              {charge.organization}
+                              {charge.created_by ? ` · ${charge.created_by}` : ""}
+                              {charge.created_at ? ` · ${formatDateTime(charge.created_at)}` : ""}
+                            </p>
+                          </div>
+                          <div className="text-left">
+                            <p className="text-xs font-bold text-violet-700">
+                              {charge.amount > 0 ? "+" : ""}
+                              {formatToman(charge.amount)}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              موجودی: {formatToman(charge.balance_after)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+              ) : null}
+
               <SectionCard title="اشتراک‌ها" count={detail.subscriptions.length} icon={CreditCard}>
                 {detail.subscriptions.length === 0 ? (
                   <Empty text="اشتراکی ندارد." />
@@ -1092,6 +1173,204 @@ function CustomerDrawer({
               </SectionCard>
             </>
           ) : null}
+        </div>
+      </div>
+
+      {charging && detail ? (
+        <WalletChargeDialog
+          customer={data}
+          organizations={detail.organizations}
+          onClose={() => setCharging(false)}
+          onDone={(balance) => {
+            setCharging(false)
+            setNotice(`کیف پول با موفقیت شارژ شد. موجودی جدید: ${formatToman(balance)}`)
+            void loadDetail()
+            onChanged()
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function WalletChargeDialog({
+  customer,
+  organizations,
+  onClose,
+  onDone,
+}: {
+  customer: CustomerRow
+  organizations: CustomerDetail["organizations"]
+  onClose: () => void
+  onDone: (balance: number) => void
+}) {
+  const [organizationId, setOrganizationId] = useState<number | null>(
+    organizations[0]?.id ?? null,
+  )
+  const [amount, setAmount] = useState("")
+  const [reason, setReason] = useState("")
+  const [date, setDate] = useState(isoToJalaliText(todayIso()))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const organization = organizations.find((org) => org.id === organizationId) ?? null
+  const amountValue = Number(normalizeDigits(amount).replace(/[^\d]/g, ""))
+
+  async function submit() {
+    setError("")
+    if (!organizationId) {
+      setError("سازمان مشتری را انتخاب کنید.")
+      return
+    }
+    if (!amountValue) {
+      setError("مبلغ شارژ را وارد کنید.")
+      return
+    }
+    if (!reason.trim()) {
+      setError("دلیل شارژ (بابت چه چیزی) الزامی است.")
+      return
+    }
+    const iso = jalaliTextToIso(date)
+    if (!iso) {
+      setError("تاریخ را به شکل ۱۴۰۵/۰۹/۰۳ وارد کنید.")
+      return
+    }
+    setSaving(true)
+    try {
+      const { data } = await api.post<{ balance: number }>(
+        `/panel/customers/${customer.id}/wallet-charge/`,
+        {
+          organization_id: organizationId,
+          amount: amountValue,
+          reason: reason.trim(),
+          date: isoToJalaliText(iso),
+        },
+      )
+      onDone(data.balance)
+    } catch (err) {
+      setError(extractError(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      onClick={(event) => {
+        event.stopPropagation()
+        onClose()
+      }}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <Wallet className="h-5 w-5 text-violet-600" />
+              شارژ کیف پول
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {customer.display_name} · موجودی فعلی{" "}
+              {organization ? formatToman(organization.wallet_balance) : "—"}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">سازمان</span>
+            <select
+              value={organizationId ?? ""}
+              onChange={(event) => setOrganizationId(Number(event.target.value))}
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            >
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name} ({formatToman(org.wallet_balance)})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              مبلغ شارژ (تومان)
+            </span>
+            <Input
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              inputMode="numeric"
+              placeholder="۵۰,۰۰۰,۰۰۰"
+            />
+            {amountValue > 0 ? (
+              <span className="mt-1 block text-[11px] text-violet-700">
+                {formatToman(amountValue)}
+              </span>
+            ) : null}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              دلیل شارژ — بابت چه چیزی؟ <span className="text-rose-500">*</span>
+            </span>
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={3}
+              maxLength={400}
+              placeholder="مثال: بابت خرید/تمدید سرویس CDN"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              تاریخ شارژ (شمسی) <span className="text-rose-500">*</span>
+            </span>
+            <Input
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              dir="ltr"
+              inputMode="numeric"
+              placeholder="۱۴۰۵/۰۹/۰۳"
+              className="text-left"
+            />
+          </label>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-800">
+            این مبلغ در دفتر کل مالی ثبت می‌شود و همراه با دلیل و تاریخ برای همیشه
+            قابل مشاهده است؛ پس از ثبت قابل حذف نیست.
+          </div>
+
+          {error ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+              {error}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>
+            انصراف
+          </Button>
+          <Button
+            size="sm"
+            className="bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300"
+            onClick={() => void submit()}
+            disabled={saving}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+            ثبت شارژ
+          </Button>
         </div>
       </div>
     </div>
