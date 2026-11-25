@@ -42,6 +42,9 @@ interface CustomerRow {
   national_id: string
   role: string
   role_label: string
+  panel_role?: string
+  is_staff?: boolean
+  is_superuser?: boolean
   is_active: boolean
   created_at: string
   last_login: string | null
@@ -77,6 +80,8 @@ interface CustomerPage {
 
 interface CustomerMeta {
   total: number
+  customers: number
+  staff: number
   verified: number
   new_last_7d: number
   active_last_7d: number
@@ -367,6 +372,7 @@ export default function UsersPage() {
 
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
+  const [account, setAccount] = useState("")
   const [verification, setVerification] = useState("")
   const [services, setServices] = useState("")
   const [ordering, setOrdering] = useState("created")
@@ -374,6 +380,11 @@ export default function UsersPage() {
   const [selected, setSelected] = useState<CustomerRow | null>(null)
   const [impersonatingId, setImpersonatingId] = useState<number | null>(null)
   const [actionError, setActionError] = useState("")
+
+  const actorRole = useAuthStore((state) => state.role)
+  // Signing into a colleague's portal borrows their panel privileges; the
+  // backend limits that to the manager, so mirror it in the UI.
+  const canImpersonateStaff = actorRole === "MANAGER"
 
   const requestId = useRef(0)
 
@@ -401,6 +412,7 @@ export default function UsersPage() {
     try {
       const params: Record<string, string | number> = { page, page_size: PAGE_SIZE, ordering }
       if (search) params.search = search
+      if (account) params.account = account
       if (verification) params.verification = verification
       if (services) params.services = services
       const { data } = await api.get<CustomerPage>("/panel/customers/", { params })
@@ -414,7 +426,7 @@ export default function UsersPage() {
     } finally {
       if (current === requestId.current) setLoading(false)
     }
-  }, [page, search, verification, services, ordering])
+  }, [page, search, account, verification, services, ordering])
 
   useEffect(() => {
     fetchMeta()
@@ -430,6 +442,10 @@ export default function UsersPage() {
   }
 
   const impersonate = useCallback(async (row: CustomerRow) => {
+    if (row.role !== "CUSTOMER" && !canImpersonateStaff) {
+      setActionError("ورود به پنل کارمندان فقط برای مدیر پنل مجاز است.")
+      return
+    }
     // Open the tab synchronously, inside the click gesture, then sever the
     // opener link *before* the ticket exists. This avoids two problems:
     // popup blockers (window.open after an await is rejected) and the
@@ -460,11 +476,11 @@ export default function UsersPage() {
     } finally {
       setImpersonatingId(null)
     }
-  }, [])
+  }, [canImpersonateStaff])
 
   const verifiedPct = useMemo(() => {
-    if (!meta?.total) return "۰"
-    return ((meta.verified / meta.total) * 100).toLocaleString("fa-IR", {
+    if (!meta?.customers) return "۰"
+    return ((meta.verified / meta.customers) * 100).toLocaleString("fa-IR", {
       maximumFractionDigits: 1,
     })
   }, [meta])
@@ -474,10 +490,10 @@ export default function UsersPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-slate-500">
-            فقط مشتریان (بدون حساب‌های پنل) بر اساس تاریخ ثبت‌نام مرتب شده‌اند؛
-            جدیدترین ثبت‌نام بالای فهرست و قدیمی‌ترین در انتها است. احرازشده و
-            احرازنشده با هم نمایش داده می‌شوند و کاربر تاییدشده با رنگ سبز مشخص
-            می‌شود.
+            همه حساب‌ها (مشتریان و کارمندان هایو) بر اساس تاریخ ثبت‌نام مرتب
+            شده‌اند؛ جدیدترین ثبت‌نام بالای فهرست و قدیمی‌ترین در انتها است.
+            احرازشده و احرازنشده با هم نمایش داده می‌شوند و کاربر تاییدشده با
+            رنگ سبز مشخص می‌شود. ورود به پنل کارمندان فقط برای مدیر پنل مجاز است.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={refreshAll} disabled={loading}>
@@ -490,7 +506,7 @@ export default function UsersPage() {
         <MetaCard
           title="کل کاربران"
           value={formatNumber(meta?.total ?? 0)}
-          note={`${formatNumber(meta?.new_last_7d ?? 0)} ثبت‌نام در ۷ روز`}
+          note={`${formatNumber(meta?.new_last_7d ?? 0)} ثبت‌نام در ۷ روز · ${formatNumber(meta?.staff ?? 0)} کارمند`}
           icon={Users}
           tone="text-indigo-600"
         />
@@ -525,7 +541,7 @@ export default function UsersPage() {
         />
       </div>
 
-      <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 lg:grid-cols-[1fr_170px_170px_240px]">
+      <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 lg:grid-cols-[1fr_170px_170px_170px_240px]">
         <div className="relative">
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -535,6 +551,18 @@ export default function UsersPage() {
             className="pr-9"
           />
         </div>
+        <select
+          value={account}
+          onChange={(event) => {
+            setAccount(event.target.value)
+            setPage(1)
+          }}
+          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
+        >
+          <option value="">همه حساب‌ها</option>
+          <option value="customer">فقط مشتریان</option>
+          <option value="staff">کارمندان هایو</option>
+        </select>
         <select
           value={verification}
           onChange={(event) => {
@@ -724,23 +752,33 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-500">{formatDateTime(row.last_login)}</td>
                   <td className="px-4 py-3 text-left">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        impersonate(row)
-                      }}
-                      disabled={impersonatingId === row.id}
-                      title={`ورود به پنل ${row.display_name}`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      {impersonatingId === row.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <LogIn className="h-3.5 w-3.5" />
-                      )}
-                      ورود
-                    </button>
+                    {row.role !== "CUSTOMER" && !canImpersonateStaff ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-400"
+                        title="ورود به پنل کارمندان فقط برای مدیر پنل مجاز است"
+                      >
+                        <ShieldAlert className="h-3.5 w-3.5" />
+                        فقط مدیر
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          impersonate(row)
+                        }}
+                        disabled={impersonatingId === row.id}
+                        title={`ورود به پنل ${row.display_name}`}
+                        className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {impersonatingId === row.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <LogIn className="h-3.5 w-3.5" />
+                        )}
+                        ورود
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -916,19 +954,29 @@ function CustomerDrawer({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onImpersonate(data)}
-              disabled={impersonating}
-            >
-              {impersonating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <LogIn className="h-4 w-4" />
-              )}
-              ورود به پنل کاربر
-            </Button>
+            {data.role !== "CUSTOMER" && role !== "MANAGER" ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-400"
+                title="ورود به پنل کارمندان فقط برای مدیر پنل مجاز است"
+              >
+                <ShieldAlert className="h-3.5 w-3.5" />
+                فقط مدیر
+              </span>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onImpersonate(data)}
+                disabled={impersonating}
+              >
+                {impersonating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogIn className="h-4 w-4" />
+                )}
+                ورود به پنل کاربر
+              </Button>
+            )}
             {canCharge ? (
               <Button
                 variant="outline"
