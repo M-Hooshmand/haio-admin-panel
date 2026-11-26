@@ -172,6 +172,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER", "OFFICE", "TECHNICAL"],
   },
   {
+    key: "didban",
+    href: "/didban",
+    title: "دیدبان",
+    description: "پایش دسترس‌پذیری، سخت‌افزار و کلاستر همهٔ مشتریان",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+  },
+  {
     key: "alerts",
     href: "/alerts",
     title: "هشدارهای سیستم",
