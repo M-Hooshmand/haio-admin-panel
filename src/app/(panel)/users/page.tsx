@@ -99,6 +99,7 @@ interface CustomerDetail {
     role: string
     wallet_id: number | null
     wallet_balance: number
+    auto_renew: boolean
     created_at: string
   }[]
   subscriptions: {
@@ -1210,7 +1211,10 @@ function CustomerDrawer({
                             {org.slug} · {org.role === "owner" ? "مالک" : "عضو"} · {formatDate(org.created_at)}
                           </p>
                         </div>
-                        <span className="text-xs text-violet-700">{formatToman(org.wallet_balance)}</span>
+                        <div className="flex items-center gap-2">
+                          <AutoRenewChip enabled={org.auto_renew} />
+                          <span className="text-xs text-violet-700">{formatToman(org.wallet_balance)}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1352,6 +1356,7 @@ function AutoRenewDialog({
     cdn_subscriptions: number
     flash_subscriptions: number
     gate_accounts: number
+    paas_organizations: number
   }) => void
 }) {
   const [saving, setSaving] = useState(false)
@@ -1360,7 +1365,8 @@ function AutoRenewDialog({
   const cdnOff = detail.cdn_subscriptions.filter((sub) => !sub.auto_renew).length
   const flashOff = detail.vms.filter((vm) => vm.auto_renew === false).length
   const gateOff = detail.gate_accounts.filter((account) => !account.auto_renew).length
-  const missing = cdnOff + flashOff + gateOff
+  const paasOff = detail.organizations.filter((org) => !org.auto_renew).length
+  const missing = cdnOff + flashOff + gateOff + paasOff
 
   async function submit(): Promise<void> {
     setSaving(true)
@@ -1371,6 +1377,7 @@ function AutoRenewDialog({
         cdn_subscriptions: number
         flash_subscriptions: number
         gate_accounts: number
+        paas_organizations: number
       }>(`/panel/customers/${customer.id}/auto-renew/`, { enabled: true })
       onDone(data)
     } catch (err) {
@@ -1407,6 +1414,7 @@ function AutoRenewDialog({
           <p>CDN: {detail.cdn_subscriptions.length} سرویس ({cdnOff} بدون تمدید خودکار)</p>
           <p>هایوفلش: {detail.vms.length} ماشین ({flashOff} بدون تمدید خودکار)</p>
           <p>هایوگیت: {detail.gate_accounts.length} اکانت ({gateOff} بدون تمدید خودکار)</p>
+          <p>پلتفرم (PaaS): {detail.organizations.length} سازمان ({paasOff} بدون تمدید خودکار)</p>
         </div>
 
         {missing === 0 ? (
