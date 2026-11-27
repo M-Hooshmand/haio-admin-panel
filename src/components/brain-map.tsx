@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import {
+  Activity,
   Cloud,
   Cpu,
   Globe2,
@@ -74,6 +75,7 @@ const PRODUCT_ICONS: Record<ProductKey, LucideIcon> = {
   campaigns: Megaphone,
   devices: MonitorSmartphone,
   hosting: Globe2,
+  didban: Activity,
   platform: Cpu,
 }
 

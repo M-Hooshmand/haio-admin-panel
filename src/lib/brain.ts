@@ -210,6 +210,7 @@ export type ProductKey =
   | "campaigns"
   | "devices"
   | "hosting"
+  | "didban"
   | "platform"
 
 export interface ProductDefinition {
@@ -229,6 +230,7 @@ export const PRODUCTS: ProductDefinition[] = [
   { key: "campaigns", label: "رشد و کمپین", hint: "ایمیل و بله", color: "#c084fc" },
   { key: "devices", label: "دستگاه‌های ابری", hint: "اندروید و دسکتاپ", color: "#60a5fa" },
   { key: "hosting", label: "میزبانی و CDN", hint: "وردپرس و CDN", color: "#7dd3fc" },
+  { key: "didban", label: "دیدبان", hint: "پایش دسترس‌پذیری و سرور", color: "#34d399" },
   { key: "platform", label: "هستهٔ پلتفرم", hint: "پنل و ایجنت‌ها", color: "#64748b" },
 ]
 
@@ -292,6 +294,10 @@ export const TASK_LABELS: Record<string, string> = {
   sweep_agent_timeouts: "پاک‌سازی ایجنت‌های بی‌پاسخ",
   sync_cdn_inventory: "همگام‌سازی CDN",
   create_cdn_renewal_invoices: "تمدید اشتراک CDN",
+  purge_raw_checks: "پاک‌سازی بررسی‌های خام",
+  mark_offline_probes: "تشخیص پروب‌های آفلاین",
+  mark_stale_agents: "تشخیص ایجنت‌های قطع‌شده",
+  send_ssl_reminders: "یادآوری انقضای SSL",
   sync_desktop_statuses: "وضعیت دسکتاپ‌ها",
   sync_wordpress_statuses: "وضعیت وردپرس",
 }
@@ -339,6 +345,10 @@ const FALLBACK_TASKS: Array<[task: string, schedule: number]> = [
   ["haio.cdn.tasks.create_cdn_renewal_invoices", 86400],
   ["haio.desktops.tasks.sync_desktop_statuses", 120],
   ["haio.wordpress.tasks.sync_wordpress_statuses", 120],
+  ["haio.didban.tasks.purge_raw_checks", 3600],
+  ["haio.didban.tasks.mark_offline_probes", 60],
+  ["haio.didban.tasks.mark_stale_agents", 60],
+  ["haio.didban.tasks.send_ssl_reminders", 86400],
 ]
 
 /** Section a client is viewing -> product cluster they are touching. */
@@ -375,6 +385,7 @@ const SECTION_PRODUCT: Record<string, ProductKey> = {
   waf: "hosting",
   ssl: "hosting",
   wordpress: "hosting",
+  didban: "didban",
   android: "devices",
   "android-cloud": "devices",
   desktop: "devices",
@@ -417,6 +428,7 @@ export const SECTION_LABELS: Record<string, string> = {
   waf: "فایروال",
   ssl: "گواهی SSL",
   wordpress: "وردپرس",
+  didban: "دیدبان",
   android: "اندروید ابری",
   "android-cloud": "اندروید ابری",
   desktop: "دسکتاپ ابری",
@@ -439,6 +451,7 @@ const BACKEND_ISSUE_PRODUCT: Record<string, ProductKey> = {
   billing: "billing",
   tickets: "tickets",
   platform: "platform",
+  didban: "didban",
 }
 
 export function productForIssueProduct(product: string | null | undefined): ProductKey {
@@ -466,6 +479,7 @@ export function severityLabel(severity: IssueSeverity): string {
 
 function taskProduct(task: string): ProductKey {
   const value = task.toLowerCase()
+  if (value.includes("didban")) return "didban"
   if (value.includes("haioflash")) return "haioflash"
   if (value.includes("antisanction") || value.includes("haiogate")) return "haiogate"
   if (value.includes("android") || value.includes("desktop")) return "devices"
