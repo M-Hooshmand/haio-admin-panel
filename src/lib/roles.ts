@@ -63,6 +63,23 @@ export interface PanelUser {
   created_at?: string
 }
 
+export type NavGroup =
+  | "dashboard"
+  | "support"
+  | "products"
+  | "finance"
+  | "infra"
+  | "messaging"
+
+export const NAV_GROUPS: { key: NavGroup; label: string }[] = [
+  { key: "dashboard", label: "داشبورد مدیریتی" },
+  { key: "support", label: "تیکت و پشتیبانی" },
+  { key: "products", label: "محصولات" },
+  { key: "finance", label: "مالی و اداری" },
+  { key: "infra", label: "زیرساخت" },
+  { key: "messaging", label: "پیامک و اعلان‌ها" },
+]
+
 export interface NavChild {
   key: string
   href: string
@@ -75,17 +92,21 @@ export interface NavItem {
   title: string
   description: string
   roles: PanelRole[]
+  /** Sidebar section the item is rendered under. */
+  group: NavGroup
   /** Sub-pages rendered under the item in the sidebar (e.g. SMS providers). */
   children?: NavChild[]
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  // ── داشبورد مدیریتی ─────────────────────────────────────────────
   {
     key: "dashboard",
     href: "/dashboard",
     title: "داشبورد",
     description: "نمای کلی وضعیت پلتفرم",
     roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+    group: "dashboard",
   },
   {
     key: "tasks",
@@ -93,142 +114,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: "تسک‌های تیم",
     description: "تخته کارهای تیم: ساخت، واگذاری و تغییر وضعیت",
     roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
-  },
-  {
-    key: "cdn",
-    href: "/cdn",
-    title: "CDN",
-    description: "اشتراک‌ها، دامنه‌ها، درآمد، ترافیک، پلن‌ها و نودهای CDN",
-    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
-  },
-  {
-    key: "users",
-    href: "/users",
-    title: "کاربران",
-    description: "جست‌وجو و مدیریت حساب‌های کاربری",
-    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE"],
-  },
-  {
-    key: "crm",
-    href: "/crm",
-    title: "پیگیری مشتریان",
-    description: "دسته‌بندی مشتریان، تماس‌های امروز، شرح حال و یادآوری",
-    roles: ["MANAGER", "OFFICE", "SALES"],
-  },
-  {
-    key: "organizations",
-    href: "/organizations",
-    title: "سازمان‌ها",
-    description: "سازمان‌ها، اعضا و کیف پول",
-    roles: ["MANAGER", "OFFICE", "FINANCE"],
-  },
-  {
-    key: "subscriptions",
-    href: "/subscriptions",
-    title: "اشتراک‌ها",
-    description: "پلن‌ها و وضعیت اشتراک مشتریان",
-    roles: ["MANAGER", "OFFICE", "SALES"],
-  },
-  {
-    key: "invoices",
-    href: "/invoices",
-    title: "فاکتورها",
-    description: "فاکتورها، پرداخت‌ها و refund",
-    roles: ["MANAGER", "FINANCE"],
-  },
-  {
-    key: "proforma",
-    href: "/proforma",
-    title: "صدور پیش‌فاکتور",
-    description: "ساخت و خروجی پیش‌فاکتور رسمی",
-    roles: ["MANAGER", "FINANCE", "SALES"],
-  },
-  {
-    key: "dedicated",
-    href: "/dedicated",
-    title: "سرورهای اختصاصی",
-    description: "فروش سرور اختصاصی (برمتال) و فاکتور خودکار دوره بعدی",
-    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE"],
-  },
-  {
-    key: "haioflash",
-    href: "/haioflash",
-    title: "هایوفلش",
-    description: "ماشین‌های ابری و وضعیت نودها",
-    roles: ["MANAGER", "TECHNICAL"],
-  },
-  {
-    key: "haiogate",
-    href: "/haiogate",
-    title: "هایوگیت",
-    description: "اکانت‌های تحریم‌شکن",
-    roles: ["MANAGER", "TECHNICAL"],
-  },
-  {
-    key: "monitoring",
-    href: "/monitoring",
-    title: "مونیتورینگ کاربران",
-    description: "کاربران آنلاین و فعال امروز",
-    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
-  },
-  {
-    key: "didban",
-    href: "/didban",
-    title: "دیدبان",
-    description: "پایش دسترس‌پذیری، سخت‌افزار و کلاستر همهٔ مشتریان",
-    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
-  },
-  {
-    key: "alerts",
-    href: "/alerts",
-    title: "هشدارهای سیستم",
-    description: "خطاهای ساعتی لاگ‌ها: ۵۰۲، خطای درگاه، سلری و سرویس‌های خواب‌رفته",
-    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
-  },
-  {
-    key: "notifications",
-    href: "/notifications",
-    title: "گزارش اعلان‌ها",
-    description: "تاریخچه ارسال ایمیل و پیامک برای همه محصولات",
-    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
-  },
-  {
-    key: "messaging",
-    href: "/messaging",
-    title: "سامانه‌های پیامکی",
-    description: "موجودی، پیامک‌های ارسالی و وضعیت تحویل",
-    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
-    children: [
-      { key: "melipayamak", href: "/messaging/melipayamak", title: "ملی‌پیامک" },
-    ],
-  },
-  {
-    key: "wordpress_report",
-    href: "/wordpress-report",
-    title: "گزارش هاست مدیریت‌شده",
-    description: "خرید، وضعیت و دامنهٔ هاست‌های وردپرس + مدیریت پلن‌ها",
-    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
-  },
-  {
-    key: "android_cloud_report",
-    href: "/android-cloud-report",
-    title: "گزارش سرویس ابری اندروید",
-    description: "دستگاه‌های ابری اندروید، دوره و پلن‌ها",
-    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
-  },
-  {
-    key: "desktop_report",
-    href: "/desktop-report",
-    title: "دسکتاپ مجازی",
-    description: "دسکتاپ‌های مجازی فروخته‌شده: مشتری، پلن رایگان یا پولی، دوره و وضعیت",
-    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
-  },
-  {
-    key: "brain",
-    href: "/brain",
-    title: "مغز زیرساخت",
-    description: "نمای زندهٔ شبکهٔ عصبی محصولات و ورکرها",
-    roles: ["MANAGER", "TECHNICAL"],
+    group: "dashboard",
   },
   {
     key: "assistant",
@@ -236,27 +122,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: "دستیار هوشمند",
     description: "اجرای درخواست‌ها با هوش مصنوعی",
     roles: ["MANAGER"],
-  },
-  {
-    key: "tickets",
-    href: "/tickets",
-    title: "تیکت‌ها",
-    description: "صف پشتیبانی و گفت‌وگو با مشتری",
-    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
-  },
-  {
-    key: "campaigns",
-    href: "/campaigns",
-    title: "کمپین‌ها",
-    description: "کمپین‌های رشد و پیام‌های گروهی",
-    roles: ["MANAGER", "SALES"],
-  },
-  {
-    key: "reports",
-    href: "/reports",
-    title: "گزارش‌ها",
-    description: "گزارش فروش، مصرف و فعالیت",
-    roles: ["MANAGER", "SALES", "FINANCE"],
+    group: "dashboard",
   },
   {
     key: "settings",
@@ -264,6 +130,196 @@ export const NAV_ITEMS: NavItem[] = [
     title: "تنظیمات",
     description: "تنظیمات پنل و دسترسی‌ها",
     roles: ["MANAGER"],
+    group: "dashboard",
+  },
+
+  // ── تیکت و پشتیبانی ─────────────────────────────────────────────
+  {
+    key: "tickets",
+    href: "/tickets",
+    title: "تیکت‌ها",
+    description: "صف پشتیبانی و گفت‌وگو با مشتری",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+    group: "support",
+  },
+  {
+    key: "crm",
+    href: "/crm",
+    title: "پیگیری مشتریان",
+    description: "دسته‌بندی مشتریان، تماس‌های امروز، شرح حال و یادآوری",
+    roles: ["MANAGER", "OFFICE", "SALES"],
+    group: "support",
+  },
+
+  // ── محصولات ────────────────────────────────────────────────────
+  {
+    key: "subscriptions",
+    href: "/subscriptions",
+    title: "اشتراک‌ها",
+    description: "پلن‌ها و وضعیت اشتراک مشتریان",
+    roles: ["MANAGER", "OFFICE", "SALES"],
+    group: "products",
+  },
+  {
+    key: "cdn",
+    href: "/cdn",
+    title: "CDN",
+    description: "اشتراک‌ها، دامنه‌ها، درآمد، ترافیک، پلن‌ها و نودهای CDN",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+    group: "products",
+  },
+  {
+    key: "dedicated",
+    href: "/dedicated",
+    title: "سرورهای اختصاصی",
+    description: "فروش سرور اختصاصی (برمتال) و فاکتور خودکار دوره بعدی",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE"],
+    group: "products",
+  },
+  {
+    key: "haioflash",
+    href: "/haioflash",
+    title: "هایوفلش",
+    description: "ماشین‌های ابری و وضعیت نودها",
+    roles: ["MANAGER", "TECHNICAL"],
+    group: "products",
+  },
+  {
+    key: "haiogate",
+    href: "/haiogate",
+    title: "هایوگیت",
+    description: "اکانت‌های تحریم‌شکن",
+    roles: ["MANAGER", "TECHNICAL"],
+    group: "products",
+  },
+  {
+    key: "wordpress_report",
+    href: "/wordpress-report",
+    title: "گزارش هاست مدیریت‌شده",
+    description: "خرید، وضعیت و دامنهٔ هاست‌های وردپرس + مدیریت پلن‌ها",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+    group: "products",
+  },
+  {
+    key: "android_cloud_report",
+    href: "/android-cloud-report",
+    title: "گزارش سرویس ابری اندروید",
+    description: "دستگاه‌های ابری اندروید، دوره و پلن‌ها",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+    group: "products",
+  },
+  {
+    key: "desktop_report",
+    href: "/desktop-report",
+    title: "دسکتاپ مجازی",
+    description: "دسکتاپ‌های مجازی فروخته‌شده: مشتری، پلن رایگان یا پولی، دوره و وضعیت",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE", "TECHNICAL"],
+    group: "products",
+  },
+
+  // ── مالی و اداری ───────────────────────────────────────────────
+  {
+    key: "invoices",
+    href: "/invoices",
+    title: "فاکتورها",
+    description: "فاکتورها، پرداخت‌ها و refund",
+    roles: ["MANAGER", "FINANCE"],
+    group: "finance",
+  },
+  {
+    key: "proforma",
+    href: "/proforma",
+    title: "صدور پیش‌فاکتور",
+    description: "ساخت و خروجی پیش‌فاکتور رسمی",
+    roles: ["MANAGER", "FINANCE", "SALES"],
+    group: "finance",
+  },
+  {
+    key: "users",
+    href: "/users",
+    title: "کاربران",
+    description: "جست‌وجو و مدیریت حساب‌های کاربری",
+    roles: ["MANAGER", "OFFICE", "SALES", "FINANCE"],
+    group: "finance",
+  },
+  {
+    key: "organizations",
+    href: "/organizations",
+    title: "سازمان‌ها",
+    description: "سازمان‌ها، اعضا و کیف پول",
+    roles: ["MANAGER", "OFFICE", "FINANCE"],
+    group: "finance",
+  },
+  {
+    key: "reports",
+    href: "/reports",
+    title: "گزارش‌ها",
+    description: "گزارش فروش، مصرف و فعالیت",
+    roles: ["MANAGER", "SALES", "FINANCE"],
+    group: "finance",
+  },
+
+  // ── زیرساخت ────────────────────────────────────────────────────
+  {
+    key: "brain",
+    href: "/brain",
+    title: "مغز زیرساخت",
+    description: "نمای زندهٔ شبکهٔ عصبی محصولات و ورکرها",
+    roles: ["MANAGER", "TECHNICAL"],
+    group: "infra",
+  },
+  {
+    key: "monitoring",
+    href: "/monitoring",
+    title: "مونیتورینگ کاربران",
+    description: "کاربران آنلاین و فعال امروز",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+    group: "infra",
+  },
+  {
+    key: "didban",
+    href: "/didban",
+    title: "دیدبان",
+    description: "پایش دسترس‌پذیری، سخت‌افزار و کلاستر همهٔ مشتریان",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+    group: "infra",
+  },
+  {
+    key: "alerts",
+    href: "/alerts",
+    title: "هشدارهای سیستم",
+    description: "خطاهای ساعتی لاگ‌ها: ۵۰۲، خطای درگاه، سلری و سرویس‌های خواب‌رفته",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+    group: "infra",
+  },
+
+  // ── پیامک و اعلان‌ها ────────────────────────────────────────────
+  {
+    key: "messaging",
+    href: "/messaging",
+    title: "سامانه‌های پیامکی",
+    description: "موجودی، پیامک‌های ارسالی و وضعیت تحویل",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+    group: "messaging",
+    children: [
+      { key: "melipayamak", href: "/messaging/melipayamak", title: "ملی‌پیامک" },
+    ],
+  },
+  {
+    key: "notifications",
+    href: "/notifications",
+    title: "گزارش اعلان‌ها",
+    description: "تاریخچه ارسال ایمیل و پیامک برای همه محصولات",
+    roles: ["MANAGER", "OFFICE", "TECHNICAL"],
+    group: "messaging",
+  },
+  {
+    key: "campaigns",
+    href: "/campaigns",
+    title: "کمپین‌ها",
+    description: "کمپین‌های رشد و پیام‌های گروهی",
+    roles: ["MANAGER", "SALES"],
+    group: "messaging",
   },
 ]
 

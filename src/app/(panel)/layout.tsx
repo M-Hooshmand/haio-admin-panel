@@ -37,7 +37,7 @@ import {
   X,
 } from "lucide-react"
 import { useAuthStore } from "@/stores/auth-store"
-import { NAV_ITEMS, PANEL_ROLE_LABELS, navItemsForUser } from "@/lib/roles"
+import { NAV_GROUPS, NAV_ITEMS, PANEL_ROLE_LABELS, navItemsForUser } from "@/lib/roles"
 import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -153,52 +153,65 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
 
-      <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto p-3">
-        {items.map((item) => {
-          const Icon = ICONS[item.key] ?? LayoutDashboard
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+      <nav className="scrollbar-thin flex-1 overflow-y-auto p-3">
+        {NAV_GROUPS.map((group) => {
+          const groupItems = items.filter((item) => item.group === group.key)
+          if (!groupItems.length) return null
           return (
-            <div key={item.key}>
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-                  active
-                    ? "bg-indigo-500/15 font-medium text-white"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white",
-                )}
-              >
-                <Icon className={cn("h-4.5 w-4.5", active ? "text-indigo-300" : "text-slate-400")} />
-                {item.title}
-              </Link>
-              {item.children?.length ? (
-                <div className="mt-1 space-y-1 border-r border-white/10 pr-2">
-                  {item.children.map((child) => {
-                    const childActive =
-                      pathname === child.href || pathname.startsWith(`${child.href}/`)
-                    return (
+            <div key={group.key} className="mb-3">
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {groupItems.map((item) => {
+                  const Icon = ICONS[item.key] ?? LayoutDashboard
+                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  return (
+                    <div key={item.key}>
                       <Link
-                        key={child.key}
-                        href={child.href}
+                        href={item.href}
                         className={cn(
-                          "flex items-center gap-2 rounded-lg py-2 pr-4 pl-3 text-[13px] transition-colors",
-                          childActive
-                            ? "bg-indigo-500/10 font-medium text-white"
-                            : "text-slate-400 hover:bg-white/5 hover:text-white",
+                          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                          active
+                            ? "bg-indigo-500/15 font-medium text-white"
+                            : "text-slate-300 hover:bg-white/5 hover:text-white",
                         )}
                       >
-                        <span
-                          className={cn(
-                            "h-1.5 w-1.5 rounded-full",
-                            childActive ? "bg-indigo-300" : "bg-slate-500",
-                          )}
-                        />
-                        {child.title}
+                        <Icon className={cn("h-4.5 w-4.5", active ? "text-indigo-300" : "text-slate-400")} />
+                        {item.title}
                       </Link>
-                    )
-                  })}
-                </div>
-              ) : null}
+                      {item.children?.length ? (
+                        <div className="mt-1 space-y-1 border-r border-white/10 pr-2">
+                          {item.children.map((child) => {
+                            const childActive =
+                              pathname === child.href || pathname.startsWith(`${child.href}/`)
+                            return (
+                              <Link
+                                key={child.key}
+                                href={child.href}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-lg py-2 pr-4 pl-3 text-[13px] transition-colors",
+                                  childActive
+                                    ? "bg-indigo-500/10 font-medium text-white"
+                                    : "text-slate-400 hover:bg-white/5 hover:text-white",
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    childActive ? "bg-indigo-300" : "bg-slate-500",
+                                  )}
+                                />
+                                {child.title}
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )
         })}
