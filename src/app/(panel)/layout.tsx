@@ -158,8 +158,8 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           const groupItems = items.filter((item) => item.group === group.key)
           if (!groupItems.length) return null
           return (
-            <div key={group.key} className="mb-3">
-              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            <div key={group.key} className="mb-3 border-t border-white/5 pt-3 first:border-0 first:pt-0">
+              <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-slate-500">
                 {group.label}
               </p>
               <div className="space-y-1">
