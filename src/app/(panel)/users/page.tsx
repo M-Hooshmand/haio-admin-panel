@@ -127,6 +127,8 @@ interface CustomerDetail {
     plan: string
     organization: string
     created_at: string
+    auto_renew: boolean | null
+    next_billing_date: string | null
   }[]
   gate_accounts: {
     id: string
@@ -136,6 +138,16 @@ interface CustomerDetail {
     usage_display: string
     expired_at: string | null
     created_at: string
+    auto_renew: boolean
+  }[]
+  cdn_subscriptions: {
+    id: string
+    plan: string
+    status: string
+    organization: string
+    auto_renew: boolean
+    next_billing_date: string | null
+    current_period_end: string | null
   }[]
   payments: {
     id: string
@@ -159,6 +171,7 @@ interface CustomerDetail {
     created_by: string
   }[]
   wallet_charge_allowed: boolean
+  auto_renew_allowed: boolean
 }
 
 const PAGE_SIZE = 25
@@ -907,6 +920,7 @@ function CustomerDrawer({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [charging, setCharging] = useState(false)
+  const [armingAutoRenew, setArmingAutoRenew] = useState(false)
   const [notice, setNotice] = useState("")
 
   const role = useAuthStore((state) => state.role)
@@ -989,6 +1003,20 @@ function CustomerDrawer({
               >
                 <Wallet className="h-4 w-4" />
                 شارژ کیف پول
+              </Button>
+            ) : null}
+            {(detail?.auto_renew_allowed ?? canCharge) ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                onClick={() => {
+                  setNotice("")
+                  setArmingAutoRenew(true)
+                }}
+              >
+                <RefreshCw className="h-4 w-4" />
+                تمدید خودکار
               </Button>
             ) : null}
             <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
@@ -1076,7 +1104,38 @@ function CustomerDrawer({
                             {vm.plan} · {vm.ip_address || "بدون IP"} · {formatDate(vm.created_at)}
                           </p>
                         </div>
-                        <StatusChip status={vm.status} map={VM_STATUS} />
+                        <div className="flex items-center gap-2">
+                          <AutoRenewChip enabled={vm.auto_renew} />
+                          <StatusChip status={vm.status} map={VM_STATUS} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+
+              <SectionCard title="سرویس CDN" count={detail.cdn_subscriptions.length} icon={Cloud}>
+                {detail.cdn_subscriptions.length === 0 ? (
+                  <Empty text="سرویس CDN ندارد." />
+                ) : (
+                  <div className="space-y-2">
+                    {detail.cdn_subscriptions.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {sub.plan} · {sub.organization}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {sub.status}
+                            {sub.next_billing_date
+                              ? ` · تمدید بعدی ${formatDate(sub.next_billing_date)}`
+                              : ""}
+                          </p>
+                        </div>
+                        <AutoRenewChip enabled={sub.auto_renew} />
                       </div>
                     ))}
                   </div>
@@ -1101,7 +1160,10 @@ function CustomerDrawer({
                             {account.expired_at ? ` · انقضا ${formatDate(account.expired_at)}` : ""}
                           </p>
                         </div>
-                        <StatusChip status={account.status} map={GATE_STATUS} />
+                        <div className="flex items-center gap-2">
+                          <AutoRenewChip enabled={account.auto_renew} />
+                          <StatusChip status={account.status} map={GATE_STATUS} />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1237,6 +1299,138 @@ function CustomerDrawer({
           }}
         />
       ) : null}
+
+      {armingAutoRenew && detail ? (
+        <AutoRenewDialog
+          customer={data}
+          detail={detail}
+          onClose={() => setArmingAutoRenew(false)}
+          onDone={(body) => {
+            setArmingAutoRenew(false)
+            setNotice(
+              `تمدید خودکار فعال شد — ${body.total} سرویس: ${body.cdn_subscriptions} CDN، ` +
+                `${body.flash_subscriptions} هایوفلش، ${body.gate_accounts} هایوگیت. ` +
+                "مبلغ تمدید در تاریخ سررسید از کیف پول کسر می‌شود.",
+            )
+            void loadDetail()
+            onChanged()
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function AutoRenewChip({ enabled }: { enabled: boolean | null }) {
+  if (enabled === null) return null
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px]",
+        enabled
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-amber-200 bg-amber-50 text-amber-700",
+      )}
+    >
+      <RefreshCw className="h-3 w-3" />
+      {enabled ? "تمدید خودکار" : "بدون تمدید خودکار"}
+    </span>
+  )
+}
+
+function AutoRenewDialog({
+  customer,
+  detail,
+  onClose,
+  onDone,
+}: {
+  customer: CustomerRow
+  detail: CustomerDetail
+  onClose: () => void
+  onDone: (body: {
+    total: number
+    cdn_subscriptions: number
+    flash_subscriptions: number
+    gate_accounts: number
+  }) => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const cdnOff = detail.cdn_subscriptions.filter((sub) => !sub.auto_renew).length
+  const flashOff = detail.vms.filter((vm) => vm.auto_renew === false).length
+  const gateOff = detail.gate_accounts.filter((account) => !account.auto_renew).length
+  const missing = cdnOff + flashOff + gateOff
+
+  async function submit(): Promise<void> {
+    setSaving(true)
+    setError("")
+    try {
+      const { data } = await api.post<{
+        total: number
+        cdn_subscriptions: number
+        flash_subscriptions: number
+        gate_accounts: number
+      }>(`/panel/customers/${customer.id}/auto-renew/`, { enabled: true })
+      onDone(data)
+    } catch (err) {
+      setError(extractError(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900">فعال‌سازی تمدید خودکار</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <p className="mt-3 text-xs leading-6 text-slate-600">
+          برای <span className="font-medium text-slate-900">{customer.display_name}</span> تمدید
+          خودکار همهٔ سرویس‌ها فعال می‌شود. در هر سررسید، مبلغ از کیف پول کسر و سرویس بدون وقفه
+          تمدید می‌شود؛ اگر موجودی کافی نباشد، هیچ مبلغی کسر نمی‌شود و فقط فاکتور پرداخت‌نشده
+          می‌ماند.
+        </p>
+
+        <div className="mt-3 space-y-1 rounded-xl bg-slate-50 p-3 text-[11px] text-slate-600">
+          <p>CDN: {detail.cdn_subscriptions.length} سرویس ({cdnOff} بدون تمدید خودکار)</p>
+          <p>هایوفلش: {detail.vms.length} ماشین ({flashOff} بدون تمدید خودکار)</p>
+          <p>هایوگیت: {detail.gate_accounts.length} اکانت ({gateOff} بدون تمدید خودکار)</p>
+        </div>
+
+        {missing === 0 ? (
+          <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-800">
+            همهٔ سرویس‌ها همین حالا تمدید خودکار دارند؛ اجرای این عملیات فقط وضعیت را تأیید می‌کند.
+          </p>
+        ) : null}
+
+        {error ? (
+          <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>
+            انصراف
+          </Button>
+          <Button size="sm" onClick={() => void submit()} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            فعال‌سازی برای همهٔ سرویس‌ها
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
