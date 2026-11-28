@@ -100,6 +100,7 @@ const EVENT_OPTIONS = [
 const CHANNEL_OPTIONS = [
   { value: "email", label: "ایمیل" },
   { value: "sms", label: "پیامک" },
+  { value: "bale", label: "بله" },
 ]
 
 const STATUS_OPTIONS = [
